@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Poppins, Unbounded } from "next/font/google";
-import { AuthProvider, DemoBanner } from "@/components/site/Auth";
+import { AuthProvider } from "@/components/site/Auth";
 import { SiteFooter } from "@/components/site/SiteFooter";
 import "./globals.css";
 
@@ -29,7 +29,6 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           Skip to content
         </a>
         <AuthProvider>
-          <DemoBanner />
           {children}
           <SiteFooter />
         </AuthProvider>
