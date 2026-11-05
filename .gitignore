@@ -1,0 +1,38 @@
+# ------------------------------------------------ secrets: never, anywhere
+.env
+.env.*
+!.env.example
+.secrets/
+keystores/
+*.pem
+*.key
+*.keystore
+*.json.key
+
+# ------------------------------------------------ dependencies and build output
+node_modules/
+contracts/out/
+contracts/cache/
+contracts/broadcast/*/*/dry-run/
+contracts/broadcast/*/*/run-[0-9]*.json
+.next/
+.vercel/
+*.tsbuildinfo
+
+# ------------------------------------------------ biometric data and renders: never committed
+.models/
+captures/
+renders/
+accounts/
+
+# ------------------------------------------------ editor and OS
+.DS_Store
+.vscode/
+
+# local run logs (public data, regenerated each run)
+deployments/*.jsonl
+deployments/*-paid-today.json
+deployments/rehearsal/
+
+# submission kit (local: BUIDL text, video script, screenshots)
+docs/submission/
