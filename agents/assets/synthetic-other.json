@@ -1,0 +1,8 @@
+{
+ "what": "a second synthetic person (face-matcher tests): an AI-generated face of a person who does not exist",
+ "project": "likeness-eth",
+ "model": "gemini-nano-banana-2.1",
+ "requestId": "IwDratCSIravoLAPyP6TwAk",
+ "prompt": "A photorealistic head-and-shoulders portrait photograph of a fictional adult who does not exist (not a real or famous person): a man in his late forties with short grey hair and a beard, friendly neutral expression, looking straight at the camera, plain light grey background, soft even studio light. The whole head and hair inside the frame, with space above the head. No text, no watermark, no logo.",
+ "createdAt": "2026-11-04T09:51:47.897Z"
+}

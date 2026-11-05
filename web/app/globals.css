@@ -1,0 +1,168 @@
+@import "tailwindcss";
+
+/*
+ * Likeness design system: the one place colours, type, radii and motion are defined.
+ * Dark chrome (#121316) above an off-white panel (#F1F3EE) of white cards, with lime as the primary
+ * accent and violet for one feature card per screen.
+ */
+@theme {
+  /* ground and text */
+  --color-ink: #121316;
+  --color-ink-raised: #1e2025;
+  --color-ink-line: #26282d;
+  --color-ink-line-2: #2e3036;
+  --color-paper: #f1f3ee;
+  --color-card: #ffffff;
+  --color-divider: #eceee8;
+  --color-field: #daddd5;
+  --color-grey: #5f636b; /* text on light */
+  --color-grey-dark: #b9bcc4; /* text on dark */
+
+  /* accents */
+  --color-lime: #dcf37b;
+  --color-lime-deep: #c9e35f;
+  --color-violet: #8b5cf6; /* white text only at 24px+ */
+  --color-violet-deep: #6d3fe0; /* violet surfaces with small white text: 6.1:1 */
+  --color-violet-soft: #ede5ff;
+  --color-sky: #cfe6f5;
+  --color-sky-soft: #e2f0f9;
+  --color-lavender: #ece6fd;
+  --color-coral: #f7a4a1;
+  --color-red: #f25f5c;
+
+  /* status pills */
+  --color-ok-bg: #eaf7e4;
+  --color-ok: #3b6e25;
+  --color-bad-bg: #fceaea;
+  --color-bad: #a33434;
+  --color-wait-bg: #f1eafe;
+  --color-wait: #6538c4;
+
+  /*
+   * Older token names, mapped onto the new palette so every existing component reads correctly on
+   * the light panel: surfaces are white cards, text is ink, notices use the waiting violet.
+   */
+  --color-ground: #121316;
+  --color-panel: #ffffff;
+  --color-surface: #ffffff;
+  --color-line: #daddd5;
+  --color-line-soft: #eceee8;
+  --color-text: #121316;
+  --color-muted: #5f636b;
+  --color-dim: #5f636b;
+  --color-up: #3b6e25;
+  --color-down: #a33434;
+  --color-warn: #6538c4;
+  --color-blue: #6538c4;
+
+  /* layout: app pages stack into one column below 900 px */
+  --breakpoint-desk: 56.25rem;
+
+  /* shapes */
+  --radius-card: 26px;
+  --radius-hero: 30px;
+  --radius-panel: 40px;
+
+  /* type */
+  --font-display: var(--font-display-face), system-ui, sans-serif;
+  --font-sans: var(--font-body-face), system-ui, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+}
+
+:root {
+  color-scheme: light;
+}
+
+html,
+body {
+  background: var(--color-ink);
+  color: var(--color-ink);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Addresses, hashes and amounts line up in columns. */
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+a {
+  text-underline-offset: 3px;
+}
+
+:focus-visible {
+  outline: 3px solid var(--color-violet);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+.on-dark :focus-visible {
+  outline-color: var(--color-lime);
+}
+
+/* ---------------------------------------------------------------- motion */
+
+@keyframes lk-marquee-l {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+@keyframes lk-marquee-r {
+  from { transform: translateX(-50%); }
+  to { transform: translateX(0); }
+}
+@keyframes lk-rise {
+  from { opacity: 0; transform: translate(-50%, 140px) scale(0.92); }
+  to { opacity: 1; transform: translate(-50%, 0) scale(1); }
+}
+@keyframes lk-drop {
+  from { opacity: 0; transform: translateY(-40px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes lk-pop {
+  0% { opacity: 0; transform: scale(0.4); }
+  70% { opacity: 1; transform: scale(1.08); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+.lk-track-l { display: flex; width: max-content; animation: lk-marquee-l 22s linear infinite; }
+.lk-track-r { display: flex; width: max-content; animation: lk-marquee-r 26s linear infinite; }
+.lk-quotes { display: flex; width: max-content; gap: 18px; animation: lk-marquee-l 40s linear infinite; }
+.lk-marquee:hover .lk-quotes,
+.lk-marquee:focus-within .lk-quotes { animation-play-state: paused; }
+.lk-rise { animation: lk-rise 1.1s cubic-bezier(0.2, 0.8, 0.2, 1) 0.25s both; }
+.lk-drop { animation: lk-drop 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+
+/* Scroll reveals: hidden only until the element is seen (see components/ds/Reveal). */
+.rv { opacity: 0; transform: translateY(48px); transition: opacity 0.8s ease, transform 0.8s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.from-l { opacity: 0; transform: translateX(-120px); transition: opacity 0.8s ease, transform 0.9s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.from-r { opacity: 0; transform: translateX(120px); transition: opacity 0.8s ease, transform 0.9s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.pop { opacity: 0; }
+.card-in { opacity: 0; transition: opacity 0.8s ease, transform 1s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.rv.in, .from-l.in, .from-r.in { opacity: 1; transform: none; }
+.pop.in { animation: lk-pop 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) 0.35s both; }
+.card-in.in { opacity: 1; }
+
+.acc-body { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 0.45s ease; }
+.acc-body.open { grid-template-rows: 1fr; }
+
+/* Striped fill inside the hero's first line. */
+.lk-texture {
+  /* A painterly multicolour fill on a dark base, standing in for the mockup's photo texture (no stock photos). */
+  background:
+    radial-gradient(ellipse 14% 60% at 12% 35%, #f25f5c 0 30%, transparent 70%),
+    radial-gradient(ellipse 12% 70% at 30% 70%, #8b5cf6 0 35%, transparent 72%),
+    radial-gradient(ellipse 10% 55% at 47% 25%, #f6a04d 0 30%, transparent 70%),
+    radial-gradient(ellipse 13% 65% at 64% 65%, #4f8de0 0 32%, transparent 72%),
+    radial-gradient(ellipse 11% 60% at 80% 30%, #c27a92 0 30%, transparent 70%),
+    radial-gradient(ellipse 12% 70% at 93% 70%, #8b5cf6 0 30%, transparent 72%),
+    linear-gradient(100deg, #121316, #2a2140 50%, #121316);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Reduced motion: everything static and visible. */
+@media (prefers-reduced-motion: reduce) {
+  .lk-track-l, .lk-track-r, .lk-quotes, .lk-rise, .lk-drop, .pop.in { animation: none !important; }
+  .rv, .from-l, .from-r, .card-in, .pop { opacity: 1 !important; transform: none !important; transition: none !important; }
+  .lk-rise { transform: translateX(-50%) !important; }
+  *, *::before, *::after { transition-duration: 0.001ms !important; scroll-behavior: auto !important; }
+}

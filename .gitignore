@@ -36,3 +36,6 @@ deployments/rehearsal/
 
 # submission kit (local: BUIDL text, video script, screenshots)
 docs/submission/
+
+# Side-by-side outputs for Rohit to watch (his face): never committed
+local-compare/
