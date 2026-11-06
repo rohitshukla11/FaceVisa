@@ -119,6 +119,10 @@ export interface BrandRequest {
   id: string;
   creator: string;
   self: boolean;
+  /** The creator's face, while they're listed (signed-in accounts). */
+  face?: string | null;
+  /** The creator's account id: to ask again with the same terms. */
+  creatorId?: string;
   kind: Kind;
   category: string;
   brief: string;
@@ -227,6 +231,26 @@ export interface ShortlistEntry {
   presence?: string | null;
   /** Which World ID credential: "selfie" (Proof of Presence) or "proof_of_human" (the Orb). */
   credential?: string;
+  /** The creator's face (their capture's first frame), for signed-in accounts; null without one. */
+  face?: string | null;
+}
+
+/** A listed creator, for the Creators page. */
+export interface CreatorCard {
+  uid: string;
+  name: string;
+  self: boolean;
+  listedAt: number;
+  image: string;
+  video: string;
+  maxDays: number;
+  refuses: string[];
+  presence?: string | null;
+  credential?: string | null;
+  seeded?: boolean;
+  arkiv: ArkivSync;
+  /** Signed-in accounts only. */
+  face: string | null;
 }
 
 export interface FaceVisaVerify {

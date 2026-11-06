@@ -1,0 +1,13 @@
+allowBuilds:
+  # their install step only marks the binary executable; src/ai/generate.ts does that itself
+  '@ffmpeg-installer/darwin-arm64': false
+  '@ffmpeg-installer/linux-x64': false
+  esbuild: false
+  # Prebuilt CPU binaries ship in the package; its postinstall only fetches CUDA files on Linux.
+  onnxruntime-node: false
+  # Its postinstall only checks versions for protobufjs's own CLI, which the Hedera SDK doesn't use at runtime.
+  protobufjs: false
+# Arkiv's SDK 1.0.1 (2 Nov 2026) is newer than the release-age policy allows. It's the exact version Arkiv's guides
+# describe, and it checks the 182-day lifetime before sending; this exception is for that one version only.
+minimumReleaseAgeExclude:
+  - '@arkiv-network/sdk@1.0.1'

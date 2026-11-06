@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FaceVisa direct verifier</title>
+<meta name="description" content="Check a FaceVisa licence on Arkiv directly from your browser: no FaceVisa server, no access key.">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+  <header style="display:flex;flex-direction:column;gap:6px">
+    <nav><b>Check a file</b> · <a href="creator.html">Where is a creator's face used?</a></nav>
+    <h1>FaceVisa direct verifier</h1>
+    <p class="muted">Is this file licensed? This page asks <b>Arkiv</b> directly, from your browser. It doesn't call FaceVisa, needs no account and no access key, and the file never leaves your device: only its SHA-256 is sent.</p>
+  </header>
+
+  <section class="card" aria-label="File">
+    <div id="drop" class="drop" tabindex="0" role="button" aria-label="Choose or drop a file">
+      <b>Drop the ad file here</b>, or click to choose it
+      <input id="file" type="file" hidden>
+    </div>
+    <label>…or paste its SHA-256
+      <input id="hash" type="text" placeholder="0x…" spellcheck="false" autocomplete="off">
+    </label>
+    <details>
+      <summary>What is checked against (change only if you know why)</summary>
+      <div style="display:flex;flex-direction:column;gap:8px;padding-top:8px">
+        <label>Namespace (the <code>app</code> attribute)<input id="ns" type="text"></label>
+        <label>FaceVisa's published receipt address (receipts from any other address are not trusted)<input id="receipt" type="text"></label>
+        <label>Arkiv JSON-RPC endpoint (public, no key)<input id="rpc" type="text"></label>
+      </div>
+    </details>
+    <button id="go" type="button">Check on Arkiv</button>
+  </section>
+
+  <section id="out" class="card" aria-live="polite" hidden></section>
+
+  <footer class="muted" style="display:flex;flex-direction:column;gap:6px">
+    <p><b>How it decides.</b> (1) The receipt for this file's hash must be owned by FaceVisa's published receipt address. (2) Its licence must be owned by the creator address the receipt names: the creator's own entity, which only they can revoke. (3) A revocation record from that same creator means "Revoked on &lt;date&gt;", and outlives the licence. (4) Otherwise the licence's status and expiry say whether it's in force. Arkiv deletes an entity when it expires, so a receipt whose licence is gone shows the licence's end date, recorded on the receipt. (5) A payment in USDT on Whitechain is checked on Whitechain's public RPC: the receipt's transaction succeeded, and FaceVisa's settlement contract emitted <code>LicensePaid</code> for this file and licence, to the creator the receipt names, for the licence's price (and from its brand while the licence remains). An older payment in USDC over x402 on Hedera is checked on Hedera's public mirror node.</p>
+    <p><b>Rate limit.</b> This uses Arkiv's public endpoint without an access key, which is rate-limited per IP address. On 4 Nov 2026 it answered <code>RateLimit: limit=2000, reset=10</code> (units per 10 s); a query costs 10 units, and one check makes 5 requests. If you hit the limit, wait a few seconds.</p>
+    <p>Source: <code>web/public/verifier/</code> in the FaceVisa repository. It also works opened straight from disk.</p>
+  </footer>
+</main>
+<script src="config.js"></script>
+<script src="verify.js"></script>
+<script>
+(function () {
+  "use strict";
+  var V = window.FaceVisaVerifier;
+  var $ = function (id) { return document.getElementById(id); };
+  var params = new URLSearchParams(location.search);
+  $("ns").value = params.get("ns") || V.DEFAULTS.namespace;
+  $("receipt").value = params.get("receipt") || V.DEFAULTS.receiptAddress;
+  $("rpc").value = params.get("rpc") || V.DEFAULTS.rpcUrl;
+  if (params.get("hash")) $("hash").value = params.get("hash");
+
+  async function useFile(file) {
+    if (!file) return;
+    $("hash").value = "hashing " + file.name + "…";
+    $("hash").value = await V.sha256Hex(file);
+    run();
+  }
+  $("drop").addEventListener("click", function () { $("file").click(); });
+  $("drop").addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); $("file").click(); } });
+  $("file").addEventListener("change", function () { useFile($("file").files[0]); });
+  $("drop").addEventListener("dragover", function (e) { e.preventDefault(); $("drop").classList.add("over"); });
+  $("drop").addEventListener("dragleave", function () { $("drop").classList.remove("over"); });
+  $("drop").addEventListener("drop", function (e) { e.preventDefault(); $("drop").classList.remove("over"); useFile(e.dataTransfer.files[0]); });
+  $("go").addEventListener("click", function () { run(); });
+
+  async function run() {
+    var out = $("out");
+    out.hidden = false;
+    out.innerHTML = '<p class="muted">Asking Arkiv…</p>';
+    $("go").disabled = true;
+    try {
+      var r = await V.verify({ fileHash: $("hash").value.trim(), namespace: $("ns").value.trim(), receiptAddress: $("receipt").value.trim(), rpcUrl: $("rpc").value.trim() });
+      out.innerHTML = V.render(r, { namespace: $("ns").value.trim(), receiptAddress: $("receipt").value.trim(), rpcUrl: $("rpc").value.trim() });
+      var reset = $("use-defaults");
+      if (reset) reset.addEventListener("click", useDefaults);
+    } catch (e) {
+      out.innerHTML = '<p class="error">' + V.esc(e.message || e) + "</p>";
+    } finally {
+      $("go").disabled = false;
+    }
+  }
+  /** Back to FaceVisa's published receipt address and RPC (also dropped from the address bar), then check again. */
+  function useDefaults() {
+    $("receipt").value = V.DEFAULTS.receiptAddress;
+    $("rpc").value = V.DEFAULTS.rpcUrl;
+    params.delete("receipt");
+    params.delete("rpc");
+    try {
+      history.replaceState(null, "", location.pathname + (params.toString() ? "?" + params : ""));
+    } catch (e) {
+      // opened from disk: the address bar can't change, the check still runs
+    }
+    run();
+  }
+  if (params.get("hash")) run();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Where is my face used</title>
+<meta name="description" content="Every FaceVisa licence of a creator's face, active, revoked or expired, read from Arkiv directly in your browser: no FaceVisa server, no access key.">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+  <header style="display:flex;flex-direction:column;gap:6px">
+    <nav><a href="index.html">Check a file</a> · <b>Where is a creator's face used?</b></nav>
+    <h1>Where is my face used</h1>
+    <p class="muted">Every ad of a creator's face that FaceVisa released, with its licence: in force, revoked or expired. This page asks <b>Arkiv</b> directly, from your browser, and Whitechain's RPC for the payments (Hedera's mirror node for older ones). It doesn't call FaceVisa and needs no account or access key.</p>
+  </header>
+
+  <section class="card" aria-label="Creator">
+    <label>The creator's address (the key that owns their listing and licences on Arkiv)
+      <input id="creator" type="text" placeholder="0x…" spellcheck="false" autocomplete="off">
+    </label>
+    <label style="flex-direction:row;align-items:center;gap:8px;color:inherit"><input id="pay" type="checkbox" checked> Check each payment on chain (Whitechain; older ones on Hedera)</label>
+    <details>
+      <summary>What is checked against (change only if you know why)</summary>
+      <div style="display:flex;flex-direction:column;gap:8px;padding-top:8px">
+        <label>Namespace (the <code>app</code> attribute)<input id="ns" type="text"></label>
+        <label>FaceVisa's published receipt address (receipts from any other address are not trusted)<input id="receipt" type="text"></label>
+        <label>Arkiv JSON-RPC endpoint (public, no key)<input id="rpc" type="text"></label>
+      </div>
+    </details>
+    <button id="go" type="button">Look up on Arkiv</button>
+  </section>
+
+  <section id="out" class="card" aria-live="polite" hidden></section>
+
+  <footer class="muted" style="display:flex;flex-direction:column;gap:6px">
+    <p><b>How it decides.</b> (1) Only receipts owned by FaceVisa's published receipt address count; receipts that name the creator from any other address are ignored and counted. (2) Each receipt's licence must be owned by the creator's own key and be for that exact file. (3) A revocation record from the creator's key means "Revoked on &lt;date&gt;", and outlives the licence. (4) Otherwise the licence's status and expiry say whether it's in force; when Arkiv has deleted an expired licence, the end recorded on the receipt is shown. (5) Each payment is checked on chain: on Whitechain, <code>LicensePaid</code> from FaceVisa's settlement contract for that file, creator and price; an older x402 payment, on Hedera's mirror node. Each file links to its full check.</p>
+    <p><b>What it can't show.</b> Only ads made and released through FaceVisa have receipts. A copy someone made elsewhere, without a licence, isn't on Arkiv at all.</p>
+    <p>Source: <code>web/public/verifier/</code> in the FaceVisa repository. It also works opened straight from disk.</p>
+  </footer>
+</main>
+<script src="config.js"></script>
+<script src="verify.js"></script>
+<script>
+(function () {
+  "use strict";
+  var V = window.FaceVisaVerifier;
+  var $ = function (id) { return document.getElementById(id); };
+  var params = new URLSearchParams(location.search);
+  $("ns").value = params.get("ns") || V.DEFAULTS.namespace;
+  $("receipt").value = params.get("receipt") || V.DEFAULTS.receiptAddress;
+  $("rpc").value = params.get("rpc") || V.DEFAULTS.rpcUrl;
+  if (params.get("creator")) $("creator").value = params.get("creator");
+  var settings = function () { return { namespace: $("ns").value.trim(), receiptAddress: $("receipt").value.trim(), rpcUrl: $("rpc").value.trim() }; };
+
+  async function run() {
+    var out = $("out");
+    out.hidden = false;
+    out.innerHTML = '<p class="muted">Asking Arkiv' + ($("pay").checked ? ", then the chain for each payment" : "") + "… (usually a few seconds)</p>";
+    $("go").disabled = true;
+    try {
+      var s = settings();
+      var r = await V.creatorUsage({ creator: $("creator").value.trim(), namespace: s.namespace, receiptAddress: s.receiptAddress, rpcUrl: s.rpcUrl, checkPayments: $("pay").checked });
+      out.innerHTML = V.renderCreator(r, s);
+      var reset = $("use-defaults");
+      if (reset) reset.addEventListener("click", useDefaults);
+      // The address bar keeps the creator, so the page can be bookmarked or shared.
+      try {
+        params.set("creator", r.creator);
+        history.replaceState(null, "", location.pathname + "?" + params);
+      } catch (e) {
+        // opened from disk
+      }
+    } catch (e) {
+      out.innerHTML = '<p class="error">' + V.esc(e.message || e) + "</p>";
+    } finally {
+      $("go").disabled = false;
+    }
+  }
+  /** Back to FaceVisa's published receipt address and RPC (also dropped from the address bar), then look again. */
+  function useDefaults() {
+    $("receipt").value = V.DEFAULTS.receiptAddress;
+    $("rpc").value = V.DEFAULTS.rpcUrl;
+    params.delete("receipt");
+    params.delete("rpc");
+    try {
+      history.replaceState(null, "", location.pathname + (params.toString() ? "?" + params : ""));
+    } catch (e) {
+      // opened from disk
+    }
+    run();
+  }
+  $("go").addEventListener("click", function () { run(); });
+  $("creator").addEventListener("keydown", function (e) { if (e.key === "Enter") run(); });
+  if (params.get("creator")) run();
+})();
+</script>
+</body>
+</html>
