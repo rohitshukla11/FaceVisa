@@ -1,0 +1,57 @@
+{
+  "name": "likeness-hsk-agents",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A2A creator and brand agents, the HSP Gateway client and a local Gateway emulator for Likeness on HSK Chain",
+  "license": "MIT",
+  "packageManager": "pnpm@12.5.1",
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "app": "tsx --env-file-if-exists=../.env.local src/app/server.ts",
+    "reset-local": "tsx scripts/reset-local.ts",
+    "face:models": "sh scripts/face-models.sh",
+    "face:calibrate": "tsx scripts/face-calibrate.ts",
+    "presence:review": "tsx scripts/presence-review.ts",
+    "arkiv:keys": "tsx --env-file-if-exists=../.env.local scripts/arkiv-keys.ts",
+    "arkiv:lifecycle": "tsx scripts/arkiv-lifecycle.ts",
+    "demo:dataset": "tsx scripts/demo-dataset.ts",
+    "arkiv:metrics": "tsx --env-file-if-exists=../.env.local scripts/arkiv-metrics.ts",
+    "arkiv:delete": "tsx --env-file-if-exists=../.env.local scripts/arkiv-delete.ts",
+    "synthetic:face": "tsx --env-file-if-exists=../.env.local scripts/synthetic-face.ts",
+    "hedera:accounts": "tsx --env-file-if-exists=../.env.local scripts/hedera-accounts.ts",
+    "hedera:fund-brand": "tsx --env-file-if-exists=../.env.local scripts/hedera-fund-brand.ts",
+    "hedera:reclaim": "tsx --env-file-if-exists=../.env.local scripts/hedera-reclaim.ts",
+    "hedera:live": "tsx --env-file-if-exists=../.env.local scripts/hedera-live.ts",
+    "test:hedera-live": "HEDERA_LIVE_TEST=1 vitest run test/hedera.live.test.ts",
+    "demo:reset": "tsx --env-file-if-exists=../.env.local scripts/demo-reset.ts",
+    "demo:backup": "tsx scripts/demo-db.ts backup",
+    "demo:restore": "tsx scripts/demo-db.ts restore",
+    "demo:dbs": "tsx scripts/demo-db.ts list",
+    "e2e": "vitest run test/e2e.test.ts",
+    "e2e:public": "tsx scripts/e2e-public.ts",
+    "e2e:live": "NODE_EXTRA_CA_CERTS=\"$(mkcert -CAROOT)/rootCA.pem\" tsx --env-file-if-exists=../.env.local scripts/e2e-live.ts"
+  },
+  "dependencies": {
+    "@arkiv-network/sdk": "1.0.1",
+    "@ffmpeg-installer/ffmpeg": "1.1.0",
+    "@hiero-ledger/sdk": "2.90.1",
+    "@worldcoin/idkit-server": "1.2.0",
+    "@x402/core": "2.29.0",
+    "@x402/hedera": "2.29.0",
+    "jose": "5.10.0",
+    "onnxruntime-node": "1.30.0",
+    "sharp": "0.35.5",
+    "viem": "2.57.7"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.5",
+    "tsx": "4.23.15",
+    "typescript": "5.9.3",
+    "vitest": "5.0.3"
+  }
+}
