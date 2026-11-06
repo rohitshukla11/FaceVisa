@@ -4,6 +4,17 @@ FaceVisa licenses creators' faces to AI ads. **Swarm keeps the ad files; Arkiv k
 points at the file.** Every ad released after 6 Nov 2026 is uploaded to Swarm once, and its Arkiv receipt carries the
 Swarm reference. Anyone holding the file can check, in their browser, that it's the one the receipt describes.
 
+## When it was built
+
+All of the Swarm work was built during the hackathon, on 6 Nov 2026. Before that, FaceVisa kept ad files on its own
+server, and its Arkiv receipts carried only the file's sha256. Built on 6 Nov:
+  - our own Bee node, funded from an event gift, and the postage batch;
+  - the upload of every released ad: showcase ads as they are, all others encrypted with their key sealed to the
+    brand and the creator;
+  - `swarm_ref` and `swarm_encrypted` on the Arkiv receipt;
+  - reading an ad back from Swarm (and decrypting it for its brand or creator) once the server's copy is gone;
+  - the Swarm check in the public verifier, and "On Swarm ↗" beside every ad in the app.
+
 ## What lives where
 
 | | On Swarm | On Arkiv |
@@ -58,7 +69,6 @@ A showcase ad (an image) released on 6 Nov 2026, namespace `facevisa-public`:
 | [`agents/src/app/runtime.ts`](../agents/src/app/runtime.ts) | Queues every newly released ad for Swarm before Arkiv hears of its receipt |
 | [`agents/src/app/facevisaRoutes.ts`](../agents/src/app/facevisaRoutes.ts) | Serves an ad from Swarm (decrypted for its brand or creator) once the server's own copy is gone; Verify shows the file's Swarm state |
 | [`web/public/verifier/verify.js`](../web/public/verifier/verify.js) | The public verifier: reads `swarm_ref` from the Arkiv receipt, fetches the file from the gateway, and checks its sha256 in the browser |
-| [`agents/test/swarm.test.ts`](../agents/test/swarm.test.ts), [`arkiv.test.ts`](../agents/test/arkiv.test.ts), [`verifier.test.ts`](../agents/test/verifier.test.ts) | Uploads, encryption and sealing, read-back, retries; the receipt's wait and reference; the browser check |
 
 ## Run one upload and one read yourself
 
@@ -76,7 +86,7 @@ A showcase ad (an image) released on 6 Nov 2026, namespace `facevisa-public`:
    curl -s https://api.gateway.ethswarm.org/bzz/6ae57247f0d306e4543917cbd7e72cb8a1080d58fc45bd3b1192cc02214f3a77/ -o ad && shasum -a 256 ad
    ```
    You should see `45b8257f6ef87ccd18ce809e002d93e3c432e2c5b8b910f5b4a35082c79fa220`, the receipt's `file_hash` without `0x`.
-3. Or open the [direct verifier](https://eth.likeness.site/verifier/index.html), paste `0x45b8257f6ef87ccd18ce809e002d93e3c432e2c5b8b910f5b4a35082c79fa220`: Licensed, and
+3. Or open the [direct verifier](https://facevisa.site/verifier/index.html), paste `0x45b8257f6ef87ccd18ce809e002d93e3c432e2c5b8b910f5b4a35082c79fa220`: Licensed, and
    "On Swarm: open the file ↗ ✓ same bytes as this file".
 
 **An upload** needs a Bee node with a usable postage batch:
@@ -89,8 +99,9 @@ In FaceVisa this happens on its own: approve an ad, and within a minute its rece
 
 ## In the demo video
 
-We approve a showcase ad as the creator, open Verify, and follow "On Swarm ↗": the gateway shows the same ad, and the
-verifier marks it "✓ same bytes as this file". Then we open the receipt on the Arkiv explorer and point at `swarm_ref`.
+TODO (Rohit): the time, `[mm:ss]`. We approve a showcase ad as the creator, open Verify, and follow "On Swarm ↗": the
+gateway shows the same ad, and the verifier marks it "✓ same bytes as this file". Then we open the receipt on the
+Arkiv explorer and point at `swarm_ref`.
 
 ## What got in our way
 
