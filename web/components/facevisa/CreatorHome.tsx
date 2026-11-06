@@ -2,8 +2,8 @@
 
 /**
  * A listed creator's dashboard. Their face (only they see the capture), status chips (listed, the World ID check, the
- * listing on Arkiv, their Hedera account), what they've earned, the ads waiting for their approval (nothing is released
- * until they approve the actual ad, in Likeness), every ad made with their face, their rules, and the public page that
+ * listing on Arkiv, where brands pay them on chain), what they've earned, the ads waiting for their approval (nothing is released
+ * until they approve the actual ad, in FaceVisa), every ad made with their face, their rules, and the public page that
  * shows where their face is used, read straight from Arkiv.
  */
 import Link from "next/link";
@@ -12,7 +12,7 @@ import { btnClass, ErrorCard, Initial, Page, StatusPill } from "@/components/ds"
 import { CaptureStep } from "@/components/dashboard/Onboarding";
 import { useAuth } from "@/components/site/Auth";
 import { post, type Me } from "@/lib/api";
-import { getJson, postJson, STATUS, usd, when, type ArkivSync, type CreatorRequest, type DataSource, type InboxItem, type LicenceView, type Meta } from "@/lib/likeness";
+import { getJson, postJson, STATUS, usd, when, type ArkivSync, type CreatorRequest, type DataSource, type InboxItem, type LicenceView, type Meta } from "@/lib/facevisa";
 import { ArkivLine } from "./ArkivLine";
 import { ItemSource, SourceLabel } from "./SourceLabel";
 import { PresenceBadge } from "./PresenceBadge";
@@ -45,15 +45,15 @@ export function CreatorHome({ me, onChange }: { me: Me; onChange: () => Promise<
   const [recapture, setRecapture] = useState(false);
   const [editRules, setEditRules] = useState(false);
   const [switching, setSwitching] = useState(false);
-  useEffect(() => void getJson<Meta>("/api/likeness").then(setMeta, () => undefined), []);
+  useEffect(() => void getJson<Meta>("/api/facevisa").then(setMeta, () => undefined), []);
   // The public page listing every licence of this face, read from Arkiv alone (the direct verifier's sibling).
   const facePage = c?.arkivAddress && meta?.arkiv.namespace ? `/verifier/creator.html?creator=${c.arkivAddress}&ns=${encodeURIComponent(meta.arkiv.namespace)}` : null;
   const load = useCallback(async () => {
     try {
       const [r, l, s] = await Promise.all([
-        getJson<{ requests: CreatorRequest[]; inbox: { items: InboxItem[]; source: DataSource } }>("/api/likeness/creator/requests"),
-        getJson<{ licences: LicenceView[] }>("/api/likeness/creator/licences"),
-        getJson<{ arkiv: ArkivSync }>("/api/likeness/creator/listing"),
+        getJson<{ requests: CreatorRequest[]; inbox: { items: InboxItem[]; source: DataSource } }>("/api/facevisa/creator/requests"),
+        getJson<{ licences: LicenceView[] }>("/api/facevisa/creator/licences"),
+        getJson<{ arkiv: ArkivSync }>("/api/facevisa/creator/listing"),
       ]);
       setRequests(r.requests);
       setInbox(r.inbox);
@@ -76,11 +76,16 @@ export function CreatorHome({ me, onChange }: { me: Me; onChange: () => Promise<
   const past = (requests ?? []).filter((r) => !OPEN.includes(r.status));
   const all = licences ?? [];
   const paid = all.filter((l) => l.receipt);
-  // Earned: real testnet USDC on Hedera only; test payments (DevPayment, no money moved) are counted apart.
-  const onHederaPaid = paid.filter((l) => l.receipt?.paymentRail?.startsWith("hedera"));
-  const onHedera = onHederaPaid.length > 0;
-  const earned = (onHedera ? onHederaPaid : paid).reduce((n, l) => n + micro(l.price), 0);
-  const testPaid = paid.length - onHederaPaid.length;
+  // Earned: real testnet stablecoins on chain only (USDT on Whitechain, or USDC on Hedera); test payments (DevPayment,
+  // no money moved) are counted apart.
+  const onChainPaid = paid.filter((l) => l.receipt?.paymentRail === "whitechain" || l.receipt?.paymentRail?.startsWith("hedera"));
+  const isOnChain = onChainPaid.length > 0;
+  const asset = onChainPaid.some((l) => l.receipt?.paymentRail === "whitechain") ? "USDT" : "USDC";
+  const earned = (isOnChain ? onChainPaid : paid).reduce((n, l) => n + micro(l.price), 0);
+  const testPaid = paid.length - onChainPaid.length;
+  const payout = c?.payout ?? (c?.hedera ? { network: "Hedera", ...c.hedera } : null);
+  // Where the earnings were paid: USDT on Whitechain (the payout address), or USDC on Hedera (the Hedera account).
+  const earnedOn = asset === "USDT" ? payout : c?.hedera ? { network: "Hedera", ...c.hedera } : payout?.network === "Hedera" ? payout : null;
   const brands = new Set(all.map((l) => l.brand)).size;
   const revoked = all.filter((l) => l.status === "revoked").length;
   // The public demo's 48-hour rule for its public accounts (Google, demo identities).
@@ -126,9 +131,9 @@ export function CreatorHome({ me, onChange }: { me: Me; onChange: () => Promise<
               ) : listingSync && listingSync.state !== "off" ? (
                 <span className={`${CHIP} bg-black/5 text-ink`}>Arkiv: {listingSync.state}</span>
               ) : null}
-              {c?.hedera && (
-                <a href={c.hedera.url} target="_blank" rel="noreferrer" className={`${CHIP} bg-violet-soft text-wait no-underline hover:underline`} title="Your Hedera account: brands pay you here (testnet USDC)">
-                  Hedera {c.hedera.account} ↗
+              {payout && (
+                <a href={payout.url} target="_blank" rel="noreferrer" className={`${CHIP} bg-violet-soft text-wait no-underline hover:underline`} title={`Your ${payout.network} ${payout.network === "Whitechain" ? "address" : "account"}: brands pay you here (testnet ${payout.network === "Whitechain" ? "USDT" : "USDC"})`}>
+                  {payout.network} {/^0x[0-9a-fA-F]{40}$/.test(payout.account) ? `${payout.account.slice(0, 6)}…${payout.account.slice(-4)}` : payout.account} ↗
                 </a>
               )}
             </div>
@@ -161,12 +166,12 @@ export function CreatorHome({ me, onChange }: { me: Me; onChange: () => Promise<
         {/* ------------------------------------------------ stats */}
         <section className="grid grid-cols-2 gap-3 md:grid-cols-5" aria-label="Your numbers">
           <Stat
-            label={onHedera ? "Earned (USDC)" : "Earned"}
+            label={isOnChain ? `Earned (${asset})` : "Earned"}
             value={usd(earned)}
             note={
-              c?.hedera && onHedera ? (
-                <a href={c.hedera.url} target="_blank" rel="noreferrer" className="underline">
-                  On HashScan ↗{testPaid ? ` · plus ${testPaid} test payment${testPaid === 1 ? "" : "s"}` : ""}
+              earnedOn && isOnChain ? (
+                <a href={earnedOn.url} target="_blank" rel="noreferrer" className="underline">
+                  On {earnedOn.network === "Whitechain" ? "the Whitechain explorer" : "HashScan"} ↗{testPaid ? ` · plus ${testPaid} test payment${testPaid === 1 ? "" : "s"}` : ""}
                 </a>
               ) : paid.length ? (
                 "test payments"
@@ -405,8 +410,8 @@ function AdCard({ l, onRevoked }: { l: LicenceView; onRevoked: () => Promise<unk
               Verify
             </Link>
           )}
-          {r?.payment?.hashscan && (
-            <a href={r.payment.hashscan} target="_blank" rel="noreferrer" className={OUTLINE}>
+          {(r?.payment?.explorer ?? r?.payment?.hashscan) && (
+            <a href={r!.payment!.explorer ?? r!.payment!.hashscan} target="_blank" rel="noreferrer" className={OUTLINE}>
               Payment ↗
             </a>
           )}
@@ -419,7 +424,7 @@ function AdCard({ l, onRevoked }: { l: LicenceView; onRevoked: () => Promise<unk
                 setBusy(true);
                 setError(null);
                 try {
-                  await postJson("/api/likeness/creator/revoke", { licenceId: l.id });
+                  await postJson("/api/facevisa/creator/revoke", { licenceId: l.id });
                   await onRevoked();
                 } catch (e) {
                   setError((e as Error).message);
@@ -455,7 +460,7 @@ function PublicPage({ href }: { href: string }) {
   return (
     <section className="flex flex-col gap-3 rounded-[22px] bg-ink p-5 text-white ring-1 ring-white/10 sm:p-6" aria-label="Your public page">
       <span className="text-[12px] font-semibold uppercase tracking-[0.08em] text-lime">Your public page</span>
-      <h2 className="m-0 text-[20px] font-bold leading-snug">Anyone can check where your face is used, read straight from Arkiv, without trusting Likeness.</h2>
+      <h2 className="m-0 text-[20px] font-bold leading-snug">Anyone can check where your face is used, read straight from Arkiv, without trusting FaceVisa.</h2>
       <code className="block truncate rounded-[12px] bg-white/5 px-3 py-2 text-[12px] text-grey-dark">{absolute}</code>
       <div className="flex flex-wrap gap-2">
         <button

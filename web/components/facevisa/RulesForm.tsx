@@ -7,7 +7,7 @@
 import { useEffect, useState } from "react";
 import { btnClass, ErrorCard } from "@/components/ds";
 import { Field, inputClass } from "@/components/ui";
-import { getJson, postJson, usd, type Listing, type Meta } from "@/lib/likeness";
+import { getJson, postJson, usd, type Listing, type Meta } from "@/lib/facevisa";
 
 export function RulesForm({ listing, onSaved, listLabel = "List me for brands" }: { listing: Listing | null; onSaved: () => Promise<unknown>; listLabel?: string }) {
   const [meta, setMeta] = useState<Meta | null>(null);
@@ -17,7 +17,7 @@ export function RulesForm({ listing, onSaved, listLabel = "List me for brands" }
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
-    void getJson<Meta>("/api/likeness").then(setMeta, () => undefined);
+    void getJson<Meta>("/api/facevisa").then(setMeta, () => undefined);
   }, []);
 
   const micro = Math.round(Number(price) * 1e6);
@@ -28,7 +28,7 @@ export function RulesForm({ listing, onSaved, listLabel = "List me for brands" }
     setBusy(true);
     setError(null);
     try {
-      await postJson("/api/likeness/creator/listing", { minPrice: price, maxDays, bannedCategories: banned });
+      await postJson("/api/facevisa/creator/listing", { minPrice: price, maxDays, bannedCategories: banned });
       await onSaved();
     } catch (e) {
       setError((e as Error).message);

@@ -7,12 +7,12 @@
  */
 import { useCallback, useEffect, useState } from "react";
 import { btnClass, Card, ErrorCard, StatusPill } from "@/components/ds";
-import { YouTubeCard } from "@/components/likeness/YouTubeCard";
+import { YouTubeCard } from "@/components/facevisa/YouTubeCard";
 import { Field, inputClass } from "@/components/ui";
 import { api, type Me, type Role } from "@/lib/api";
-import { RulesForm } from "@/components/likeness/RulesForm";
-import { LivenessCapture, type Capture } from "@/components/likeness/LivenessCapture";
-import { PresenceCard } from "@/components/likeness/PresenceCard";
+import { RulesForm } from "@/components/facevisa/RulesForm";
+import { LivenessCapture, type Capture } from "@/components/facevisa/LivenessCapture";
+import { PresenceCard } from "@/components/facevisa/PresenceCard";
 import { useAuth } from "@/components/site/Auth";
 
 export function ChooseRole({ onDone, initialName = "" }: { onDone: () => Promise<unknown>; initialName?: string }) {
@@ -49,7 +49,7 @@ export function ChooseRole({ onDone, initialName = "" }: { onDone: () => Promise
           </button>
         </Card>
         <Card tone="lime" title="Start with your creator profile">
-          <p className="m-0 text-[14px]">Put your own face on Likeness: set your price and refused categories; nothing is released without your approval.</p>
+          <p className="m-0 text-[14px]">Put your own face on FaceVisa: set your price and refused categories; nothing is released without your approval.</p>
           <button type="button" disabled={busy !== null || !nameOk} onClick={() => void choose("creator")} className={btnClass("ink", "self-start")}>
             {busy === "creator" ? "Setting up…" : "Start as a creator"}
           </button>
@@ -186,7 +186,7 @@ export function CaptureStep({ me, onSaved }: { me: Me; onSaved: () => Promise<un
       </label>
       {demoRetention !== null && (
         <p role="note" className="m-0 rounded-[12px] bg-paper p-3 text-[13px]">
-          Your photo is sent to 0G (ByteDance Seedream) or Google Vertex to generate ads, and deleted from Likeness after {demoRetention} hours. The ads made of you are deleted after {demoRetention} hours too. Arkiv, the public record, only ever holds hashes (of your ads, licences and receipts), never your photo or an ad.
+          Your photo is sent to 0G (ByteDance Seedream) or Google Vertex to generate ads, and deleted from FaceVisa after {demoRetention} hours. The ads made of you are deleted after {demoRetention} hours too. Arkiv, the public record, only ever holds hashes (of your ads, licences and receipts), never your photo or an ad.
         </p>
       )}
       <button type="button" disabled={busy || !capture || !consent} onClick={() => void save()} className={btnClass("ink", "self-start")}>

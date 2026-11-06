@@ -10,7 +10,7 @@
 import { useEffect, useState } from "react";
 import { btnClass, Card, ErrorCard, StatusPill } from "@/components/ds";
 import type { Me } from "@/lib/api";
-import { getJson, postJson, YOUTUBE, type Meta } from "@/lib/likeness";
+import { getJson, postJson, YOUTUBE, type Meta } from "@/lib/facevisa";
 
 const count = (n: number) => (n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${(n / 1e3).toFixed(1)}k` : String(n));
 
@@ -29,7 +29,7 @@ export function YouTubeCard({ me, onChange }: { me: Me; onChange: () => Promise<
       u.searchParams.delete("youtube");
       window.history.replaceState(null, "", `${u.pathname}${u.search}`);
     }
-    void getJson<Meta>("/api/likeness").then((m) => setConfigured(m.youtube), () => setConfigured(false));
+    void getJson<Meta>("/api/facevisa").then((m) => setConfigured(m.youtube), () => setConfigured(false));
   }, []);
   // The face match runs in the background after linking: refresh until it has a result.
   useEffect(() => {
@@ -86,7 +86,7 @@ export function YouTubeCard({ me, onChange }: { me: Me; onChange: () => Promise<
                     ? "No faces in your channel picture or recent thumbnails, so no face badge. That's fine: nothing is blocked."
                     : `${fm.matches} of ${fm.withFace} channel images with a face match your live capture; the badge needs 2. Nothing is blocked.`}
           </p>
-          <button type="button" disabled={!!busy} className={btnClass("outline", "min-h-9 self-start")} onClick={() => void run("unlink", async () => (await postJson("/api/likeness/creator/youtube/unlink", {}), await onChange(), setBusy(null)))}>
+          <button type="button" disabled={!!busy} className={btnClass("outline", "min-h-9 self-start")} onClick={() => void run("unlink", async () => (await postJson("/api/facevisa/creator/youtube/unlink", {}), await onChange(), setBusy(null)))}>
             {busy === "unlink" ? "Unlinking…" : "Unlink channel"}
           </button>
         </>
@@ -103,7 +103,7 @@ export function YouTubeCard({ me, onChange }: { me: Me; onChange: () => Promise<
               className={btnClass("ink", "self-start")}
               onClick={() =>
                 void run("link", async () => {
-                  const { url } = await postJson<{ url: string }>("/api/likeness/creator/youtube/start", {});
+                  const { url } = await postJson<{ url: string }>("/api/facevisa/creator/youtube/start", {});
                   window.location.assign(url);
                 })
               }

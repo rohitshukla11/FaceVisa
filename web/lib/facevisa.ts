@@ -1,5 +1,5 @@
 /**
- * Likeness's own flow (the agents backend's /api/likeness and /api/approvals routes): types and fetch helpers.
+ * FaceVisa's own flow (the agents backend's /api/facevisa and /api/approvals routes): types and fetch helpers.
  * Every call carries our HttpOnly session cookie; every POST also sends the session's CSRF token (from /api/me) as
  * x-csrf-token.
  */
@@ -17,12 +17,12 @@ export type ArkivSync =
   | { state: "none"; note?: string };
 
 /** Where a screen's data came from: read from Arkiv, or the backend (not yet confirmed on Arkiv, and why). */
-export type DataSource = { from: "arkiv"; namespace: string; entities: number; fallback: number; note?: string } | { from: "likeness"; why: string };
+export type DataSource = { from: "arkiv"; namespace: string; entities: number; fallback: number; note?: string } | { from: "facevisa"; why: string };
 
 /** A request in the creator's inbox: from its entity on Arkiv (with Arkiv's review deadline) or from the backend. */
 export interface InboxItem {
   id: string;
-  source: "arkiv" | "likeness";
+  source: "arkiv" | "facevisa";
   reviewBy: number;
   entityKey?: string;
   url?: string;
@@ -72,6 +72,8 @@ export interface Meta {
   arkiv: { on: boolean; namespace?: string | null };
   /** Pay to release over x402 on Hedera testnet, and the brand agent's audit log on an HCS topic. */
   hedera?: { x402: boolean; audit?: { topic: string | null; url: string | null; sent: number; pending: number } | null };
+  /** How brands pay creators on this server: USDT on Whitechain (the default), USDC on Hedera, or null for test payments. */
+  payments?: { rail: "whitechain" | "hedera"; network: string; asset: string; chainId?: number; usdt?: string; settlement?: string; explorer?: string; rpcUrl?: string } | null;
 }
 
 export interface Listing {
@@ -131,7 +133,7 @@ export interface BrandRequest {
   reason: string | null;
   licenceId: string | null;
   output: OutputView | null;
-  /** "approved by the creator in Likeness"; method: how they signed in (dev, demo). */
+  /** "approved by the creator in FaceVisa"; method: how they signed in (dev, demo). */
   consent: { method: Identity; approvedAt: number } | null;
   /** "spend approved by the brand": null when not needed. */
   spend: { approvedAt: number | null } | null;
@@ -143,8 +145,9 @@ export interface BrandRequest {
 }
 
 /**
- * How an ad was paid for. rail "dev": DevPayment, a test payment (no money moved). rail "hedera-x402 (testnet)": the
- * brand agent paid the creator in USDC over x402 on Hedera testnet; `ref` is the Hedera transaction ID.
+ * How an ad was paid for. rail "dev": DevPayment, a test payment (no money moved). rail "whitechain": USDT on Whitechain
+ * testnet through FaceVisa's settlement contract; `ref` is the transaction hash. rail "hedera-x402 (testnet)": USDC over
+ * x402 on Hedera testnet; `ref` is the Hedera transaction ID.
  */
 export interface PaymentView {
   rail: string | null;
@@ -155,9 +158,11 @@ export interface PaymentView {
   payer?: string | null;
   payee?: string | null;
   hashscan?: string;
+  /** The transaction on the chain's explorer (Whitechain's Blockscout, or HashScan). */
+  explorer?: string;
   payerUrl?: string | null;
   payeeUrl?: string | null;
-  /** Verify only: the payment as Hedera's mirror node records it. */
+  /** Verify only: the payment as the chain records it (Whitechain's RPC, or Hedera's mirror node). */
   check?: { state: "confirmed" | "mismatch" | "not-found" | "unreachable"; result?: string; consensusAt?: number; checks: { ok: boolean; text: string }[]; error?: string };
 }
 
@@ -213,7 +218,7 @@ export interface ShortlistEntry {
   reason: string;
   /** The creator's linked channel (picks only): what the agent used to rank them. */
   youtube?: { title: string; subscribers: number | null; topics: string[]; faceMatch: boolean };
-  source?: "arkiv" | "likeness";
+  source?: "arkiv" | "facevisa";
   url?: string;
   why?: string;
   /** The public demo: a seeded creator, whom nobody can sign in as (requests to them go unanswered). */
@@ -224,7 +229,7 @@ export interface ShortlistEntry {
   credential?: string;
 }
 
-export interface LikenessVerify {
+export interface FaceVisaVerify {
   verdict: "Licensed" | "Revoked" | "Expired" | "Unknown";
   reason?: string;
   licence?: { id: string; kind: Kind; category: string; durationDays: number; price: string; status: string; createdAt: number; expiresAt: number; brand: string; creator: string };
@@ -283,7 +288,7 @@ export const STATUS: Record<ActionStatus, { label: string; pill: Pill }> = {
 export const YOUTUBE: Record<string, { ok: boolean; text: string }> = {
   linked: { ok: true, text: "Channel linked. Checking its face match now." },
   cancelled: { ok: false, text: "You cancelled at Google, so nothing was linked." },
-  taken: { ok: false, text: "That channel is already linked to another Likeness account." },
+  taken: { ok: false, text: "That channel is already linked to another FaceVisa account." },
   "no-channel": { ok: false, text: "That Google account has no YouTube channel. Pick the account that owns your channel." },
   failed: { ok: false, text: "Linking didn't complete, so nothing changed. Try again." },
 };

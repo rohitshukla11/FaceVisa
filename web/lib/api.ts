@@ -1,7 +1,7 @@
 /**
  * The agents backend (agents/src/app/server.ts), proxied by next.config.ts: the signed-in account and small fetch
  * helpers. Every call runs in the browser and carries our HttpOnly session cookie after sign-in; every POST
- * also carries the session's CSRF token. Likeness's own flow has its types and helpers in lib/likeness.ts.
+ * also carries the session's CSRF token. FaceVisa's own flow has its types and helpers in lib/facevisa.ts.
  */
 
 export type Role = "brand" | "creator";
@@ -34,10 +34,12 @@ export type Me = {
     arkivAddress?: string | null;
     /** Their Hedera account (where brands pay them) and its HashScan page, with x402 payments on. */
     hedera?: { account: string; url: string } | null;
+    /** Where brands pay them: their Whitechain address (or Hedera account) and its explorer page. */
+    payout?: { network: string; account: string; url: string } | null;
     /** state: none; verified (may list); review (a high risk signal, held for a person to clear); rejected. */
     /** optional: the public demo's two paths (Proof of Presence in its labelled environment, or unverified). */
     presence?: { required: boolean; optional?: boolean; credential?: "selfie" | "proof_of_human" | null; skipped?: "demo"; state?: "none" | "verified" | "review" | "rejected"; verified: boolean; verifiedAt?: number | null; sybilScore?: number | null; maxSybilScore?: number; environment?: string | null };
-    listing: import("./likeness").Listing | null;
+    listing: import("./facevisa").Listing | null;
   } | null;
   /** This session's CSRF token, sent back as x-csrf-token on every POST. */
   csrf?: string;
@@ -64,7 +66,7 @@ export async function post(path: string, body: unknown, init: RequestInit = {}):
 }
 
 /** What a page says when the backend can't be reached (or the proxy answers for it without our JSON). */
-export const SERVER_DOWN = "The Likeness server isn't answering right now (it may be restarting). Try again in a moment.";
+export const SERVER_DOWN = "The FaceVisa server isn't answering right now (it may be restarting). Try again in a moment.";
 
 /** Our API, same origin: the HttpOnly session cookie goes along by itself, and POSTs carry the CSRF token. */
 export async function api<T>(path: string, body?: unknown): Promise<T> {

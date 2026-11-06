@@ -2,13 +2,13 @@
 
 /**
  * A spend over the brand workspace's limit: the brand's agent is paused until the brand approves this exact amount in
- * Likeness ("spend approved by the brand"). Deny or let it expire, and nothing is spent or released.
+ * FaceVisa ("spend approved by the brand"). Deny or let it expire, and nothing is spent or released.
  */
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { AppPage, btnClass, Card, ErrorCard, NoticePage, StatusPill } from "@/components/ds";
 import { SignInChoice, useAuth } from "@/components/site/Auth";
-import { getJson, postJson, STATUS, when, type BrandRequest, type Meta } from "@/lib/likeness";
+import { getJson, postJson, STATUS, when, type BrandRequest, type Meta } from "@/lib/facevisa";
 import { SlowStep } from "./SlowStep";
 
 type View = { request: BrandRequest };
@@ -32,7 +32,7 @@ export function SpendPage({ id }: { id: string }) {
     }
   }, [id]);
   useEffect(() => {
-    void getJson<Meta>("/api/likeness").then(setMeta, () => undefined);
+    void getJson<Meta>("/api/facevisa").then(setMeta, () => undefined);
   }, []);
   useEffect(() => {
     if (user) void load();
@@ -67,7 +67,7 @@ export function SpendPage({ id }: { id: string }) {
   const decide = (decision: "approve" | "deny") =>
     run(decision, async () => {
       await postJson("/api/approvals/spend/decide", { id, decision, amount: r?.price.replace(/^\$/, "") });
-      setNotice({ ok: true, text: decision === "approve" ? "Spend approved by you in Likeness: the agent pays and releases the ad." : "Denied: nothing spent, nothing released." });
+      setNotice({ ok: true, text: decision === "approve" ? "Spend approved by you in FaceVisa: the agent pays and releases the ad." : "Denied: nothing spent, nothing released." });
       await load();
     });
 
@@ -80,9 +80,9 @@ export function SpendPage({ id }: { id: string }) {
       {r && (
         <Card tone={open ? "lime" : "white"} title={<span className="flex flex-wrap items-center gap-2">Spend {r.price} on an ad of {r.self ? "your own creator profile" : r.creator} <StatusPill kind={STATUS[r.status].pill}>{STATUS[r.status].label}</StatusPill></span>}>
           <p className="m-0 text-[14px]">
-            “{r.brief}” · {r.category} · {r.durationDays} days. {r.consent ? `The creator approved the finished ${r.kind} in Likeness, ${when(r.consent.approvedAt)}.` : ""} The ad is released only after you approve and the agent pays.
+            “{r.brief}” · {r.category} · {r.durationDays} days. {r.consent ? `The creator approved the finished ${r.kind} in FaceVisa, ${when(r.consent.approvedAt)}.` : ""} The ad is released only after you approve and the agent pays.
           </p>
-          <SlowStep status={r.status} kind={r.kind} since={r.stepAt} ai={meta?.ai} x402={!!meta?.hedera?.x402} />
+          <SlowStep status={r.status} kind={r.kind} since={r.stepAt} ai={meta?.ai} rail={meta?.payments?.rail} />
           {open && (
             <div className="flex flex-col gap-2">
               <div className="flex flex-wrap gap-2">

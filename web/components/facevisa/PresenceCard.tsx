@@ -2,20 +2,20 @@
 
 /**
  * Proof of Presence before listing: World ID's Selfie Check (liveness and face similarity in the World ID app; no Orb
- * needed). One World ID lists one Likeness profile. The server signs the request and verifies the result; a cancel or
+ * needed). One World ID lists one FaceVisa profile. The server signs the request and verifies the result; a cancel or
  * a failure changes nothing.
  */
 import dynamic from "next/dynamic";
 import { useRef, useState } from "react";
 import { btnClass, ErrorCard } from "@/components/ds";
 import type { Me } from "@/lib/api";
-import { postJson, when } from "@/lib/likeness";
+import { postJson, when } from "@/lib/facevisa";
 import type { PresenceRequest } from "./PresenceWidget";
 
 const PresenceWidget = dynamic(() => import("./PresenceWidget"), { ssr: false });
 
 /** One World ID, one listing: the World ID app or our server says this person already used the once-only action. */
-const ALREADY = "This World ID has already completed the World ID check for Likeness: it's already listed under another account. One World ID lists one profile. Sign in with that account instead.";
+const ALREADY = "This World ID has already completed the World ID check for FaceVisa: it's already listed under another account. One World ID lists one profile. Sign in with that account instead.";
 /** Our server's refusals after the World ID app finished, in words. */
 const SERVER: Record<string, string> = {
   nullifier_used: ALREADY,
@@ -62,18 +62,18 @@ export function PresenceCard({ me, onChange }: { me: Me; onChange: () => Promise
   if (p.state === "review")
     return (
       <div role="status" className="rounded-[16px] bg-wait-bg p-4 text-[14px] text-wait">
-        <b>Under review.</b> Your Proof of Presence went through{p.verifiedAt ? ` (${when(p.verifiedAt)})` : ""}, and World ID gave it a risk signal of {p.sybilScore} of 10, above this site&apos;s limit of {p.maxSybilScore}. That&apos;s not a refusal: a person at Likeness reviews it, and you can list once it&apos;s cleared. Nothing else is needed from you.
+        <b>Under review.</b> Your Proof of Presence went through{p.verifiedAt ? ` (${when(p.verifiedAt)})` : ""}, and World ID gave it a risk signal of {p.sybilScore} of 10, above this site&apos;s limit of {p.maxSybilScore}. That&apos;s not a refusal: a person at FaceVisa reviews it, and you can list once it&apos;s cleared. Nothing else is needed from you.
       </div>
     );
   if (p.state === "rejected")
-    return <ErrorCard>Your Proof of Presence wasn&apos;t cleared in review, so this World ID can&apos;t list a profile on Likeness.</ErrorCard>;
+    return <ErrorCard>Your Proof of Presence wasn&apos;t cleared in review, so this World ID can&apos;t list a profile on FaceVisa.</ErrorCard>;
 
   const start = async () => {
     outcome.current = null;
     setBusy(true);
     setNotice(null);
     try {
-      setRequest(await postJson<PresenceRequest>("/api/likeness/creator/presence/start", {}));
+      setRequest(await postJson<PresenceRequest>("/api/facevisa/creator/presence/start", {}));
     } catch (e) {
       setNotice({ ok: false, text: (e as Error).message });
     } finally {
@@ -97,7 +97,7 @@ export function PresenceCard({ me, onChange }: { me: Me; onChange: () => Promise
           </>
         ) : (
           <>Before you list, show you&apos;re a real person who is present: a short selfie check in the World ID app (no Orb needed). Already verified with the Orb? That works too.</>
-        )} Scan the code with your phone. One World ID lists one Likeness profile; your selfie stays in the World ID app.
+        )} Scan the code with your phone. One World ID lists one FaceVisa profile; your selfie stays in the World ID app.
       </p>
       <button type="button" disabled={busy || !!request} onClick={() => void start()} className={btnClass("ink", "self-start")}>
         {busy ? "Preparing…" : request ? "Waiting for the World ID app…" : test === "sandbox" ? "Share Proof of Human with World ID (sandbox)" : "Prove you're present with World ID"}
@@ -109,14 +109,14 @@ export function PresenceCard({ me, onChange }: { me: Me; onChange: () => Promise
           onOpenChange={(open) => {
             if (open) return;
             // Closed without a result (the widget's ×): recorded as an end, like a cancel in the World ID app.
-            if (!outcome.current) void postJson("/api/likeness/creator/presence/cancel", { nonce: request.rp_context.nonce, code: "closed" }).catch(() => undefined);
+            if (!outcome.current) void postJson("/api/facevisa/creator/presence/cancel", { nonce: request.rp_context.nonce, code: "closed" }).catch(() => undefined);
             setRequest(null);
           }}
           verify={async (result) => {
             // The server checks it against the request it signed and asks World. A refusal is shown here in our
             // words (IDKit shows only a generic failure), then rethrown so IDKit ends.
             try {
-              const r = await postJson<{ presence: { state: "verified" | "review" } }>("/api/likeness/creator/presence/verify", { result });
+              const r = await postJson<{ presence: { state: "verified" | "review" } }>("/api/facevisa/creator/presence/verify", { result });
               outcome.current = r.presence.state;
             } catch (e) {
               const code = (e as { code?: string }).code;
@@ -131,7 +131,7 @@ export function PresenceCard({ me, onChange }: { me: Me; onChange: () => Promise
             void onChange();
           }}
           onError={(code) => {
-            void postJson("/api/likeness/creator/presence/cancel", { nonce: request.rp_context.nonce, code }).catch(() => undefined);
+            void postJson("/api/facevisa/creator/presence/cancel", { nonce: request.rp_context.nonce, code }).catch(() => undefined);
             setRequest(null);
             setNotice({ ok: false, text: OUTCOME[code] ?? `The check didn't complete (${code}). Nothing changed.` });
           }}

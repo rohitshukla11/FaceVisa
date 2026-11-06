@@ -6,14 +6,14 @@
  */
 import { useCallback, useEffect, useState } from "react";
 import { AppPage, btnClass, Card, ErrorCard, StatusPill } from "@/components/ds";
-import { getJson } from "@/lib/likeness";
+import { getJson } from "@/lib/facevisa";
 
 type Level = "ok" | "warn" | "error" | "off";
 type Check = { level: Level; summary: string; detail?: Record<string, unknown> };
 type Health = { at: string; mode: string; ok: boolean; warnings: string[]; checks: Record<string, Check> };
 
 const PILL: Record<Level, "licensed" | "waiting" | "revoked" | "neutral"> = { ok: "licensed", warn: "waiting", error: "revoked", off: "neutral" };
-const LABEL: Record<string, string> = { identity: "Identity", arkiv: "Arkiv", hedera: "Hedera x402", zerog: "0G", vertex: "Vertex AI", caps: "AI caps today" };
+const LABEL: Record<string, string> = { identity: "Identity", arkiv: "Arkiv", whitechain: "Whitechain payments", hedera: "Hedera x402", zerog: "0G", vertex: "Vertex AI", caps: "AI caps today" };
 
 export default function HealthPage() {
   const [h, setH] = useState<Health | null>(null);

@@ -4,7 +4,7 @@
  * mode) tracks one face; the person blinks, then turns slightly one way and the other. A frame is
  * grabbed straight from the camera at each pose: front, slight left, slight right. No file uploads.
  * What this shows: a live, moving face at capture time. It is not a certified presentation-attack test.
- * Copied from likeness-meta (components/creator/LivenessCapture.tsx @93993bc); see CHANGES.md.
+ * Copied from Rohit's earlier face project (components/creator/LivenessCapture.tsx @93993bc); see CHANGES.md.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { pillClass } from "@/components/ds";

@@ -4,7 +4,7 @@
  * One line on where a record stands on Arkiv: its entity (with the explorer link) once mirrored, or "sync pending" /
  * "sync failed". Nothing when Arkiv is off, or when the record isn't meant to be on Arkiv.
  */
-import type { ArkivSync } from "@/lib/likeness";
+import type { ArkivSync } from "@/lib/facevisa";
 
 export function ArkivLine({ label, s }: { label: string; s: ArkivSync | undefined }) {
   if (!s || s.state === "off" || s.state === "none") return null;

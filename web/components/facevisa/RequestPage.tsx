@@ -3,14 +3,14 @@
 /**
  * One request, as its creator sees it. "Agents negotiate. Only the human consents to their face being used." The
  * brand's agent has already made the ad; nothing is released. The signed-in creator sees the ad and its terms and
- * decides in Likeness: Approve this exact ad (bound to its file hash, the brand, usage, duration and price), Reject
+ * decides in FaceVisa: Approve this exact ad (bound to its file hash, the brand, usage, duration and price), Reject
  * (one new version) or Deny. The approval names the file the page showed: if the ad changed, it's refused.
  */
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { AppPage, btnClass, Card, ErrorCard, NoticePage, StatusPill } from "@/components/ds";
 import { SignInChoice, useAuth } from "@/components/site/Auth";
-import { getJson, postJson, STATUS, when, type BrandRequest, type CreatorRequest, type Meta } from "@/lib/likeness";
+import { getJson, postJson, STATUS, when, type BrandRequest, type CreatorRequest, type Meta } from "@/lib/facevisa";
 import { ArkivLine } from "./ArkivLine";
 import { MediaTile } from "./ReceiptTile";
 import { SlowStep } from "./SlowStep";
@@ -41,7 +41,7 @@ export function RequestPage({ id }: { id: string }) {
   }, [id]);
 
   useEffect(() => {
-    void getJson<Meta>("/api/likeness").then(setMeta, () => undefined);
+    void getJson<Meta>("/api/facevisa").then(setMeta, () => undefined);
   }, []);
   useEffect(() => {
     if (!user) return;
@@ -80,7 +80,7 @@ export function RequestPage({ id }: { id: string }) {
       await postJson("/api/approvals/decide", { id, decision, outputHash: r?.output?.hash });
       setNotice(
         decision === "approve"
-          ? { ok: true, text: "Approved by you in Likeness: this exact ad, for this brand, usage, duration and price. The brand's agent pays you, then it is released." }
+          ? { ok: true, text: "Approved by you in FaceVisa: this exact ad, for this brand, usage, duration and price. The brand's agent pays you, then it is released." }
           : decision === "reject"
             ? { ok: true, text: r?.generation === 1 ? "Rejected. The agent is making one new version for you to review." : "Rejected again: the request has ended. Nothing released, nothing charged." }
             : { ok: true, text: "Denied. Nothing released, nothing charged." },
@@ -115,14 +115,14 @@ export function RequestPage({ id }: { id: string }) {
           <p className="m-0 text-[14px]">
             This page is where {b.creator} reviews the ad. You&apos;re signed in as the brand that asked, so you see your side of it: “{b.brief}” · {b.category}, {b.durationDays} days.
           </p>
-          <SlowStep status={b.status} kind={b.kind} since={b.stepAt} ai={meta?.ai} x402={!!meta?.hedera?.x402} />
+          <SlowStep status={b.status} kind={b.kind} since={b.stepAt} ai={meta?.ai} rail={meta?.payments?.rail} />
           {b.lastStep && (
             <p className={`m-0 text-[14px] ${b.lastStep.kind === "blocked" ? "text-wait" : "text-grey"}`}>
               Latest step ({when(b.lastStep.at)}): {b.lastStep.summary}
             </p>
           )}
           {b.status === "approved" && (
-            <button type="button" disabled={!!busy} className={btnClass("lime", "self-start")} onClick={() => void run("release", async () => { await postJson("/api/likeness/agent/release", { id }); await load(); })}>
+            <button type="button" disabled={!!busy} className={btnClass("lime", "self-start")} onClick={() => void run("release", async () => { await postJson("/api/facevisa/agent/release", { id }); await load(); })}>
               {busy === "release" ? "Paying…" : `Pay ${b.price} and release`}
             </button>
           )}
@@ -144,10 +144,10 @@ export function RequestPage({ id }: { id: string }) {
             {r.status === "generating" && (
               <>
                 <p className="m-0 text-[14px]">The agent is making {r.generation > 1 ? "a new version, after your rejection" : "the ad"}. It shows here for your review when it&apos;s ready.</p>
-                <SlowStep status={r.status} kind={r.kind} since={r.stepAt} ai={meta?.ai} x402={!!meta?.hedera?.x402} />
+                <SlowStep status={r.status} kind={r.kind} since={r.stepAt} ai={meta?.ai} rail={meta?.payments?.rail} />
               </>
             )}
-            {r.status === "paying" && <SlowStep status={r.status} kind={r.kind} since={r.stepAt} ai={meta?.ai} x402={!!meta?.hedera?.x402} />}
+            {r.status === "paying" && <SlowStep status={r.status} kind={r.kind} since={r.stepAt} ai={meta?.ai} rail={meta?.payments?.rail} />}
             {r.request && r.output ? (
               <div className="grid grid-cols-1 gap-4 md:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
                 {r.output.file && <MediaTile file={r.output.file} mime={r.output.mime} large caption={`${r.output.provider === "test" ? "TEST RENDER (no AI)" : r.output.model} · face check ${r.output.faceCheck === "passed" ? "passed" : "not run"}${r.generation > 1 ? " · second version" : ""}`} />}
@@ -163,7 +163,7 @@ export function RequestPage({ id }: { id: string }) {
                   {r.decidedAt && (
                     <>
                       <dt className="text-grey">You decided</dt>
-                      <dd className="m-0">in Likeness, {when(r.decidedAt)}</dd>
+                      <dd className="m-0">in FaceVisa, {when(r.decidedAt)}</dd>
                     </>
                   )}
                 </dl>

@@ -7,8 +7,8 @@
  */
 import { AppPage, Card } from "@/components/ds";
 import { ChooseRole, CreatorOnboarding } from "@/components/dashboard/Onboarding";
-import { BrandAgentConsole } from "@/components/likeness/BrandAgentConsole";
-import { CreatorHome } from "@/components/likeness/CreatorHome";
+import { BrandAgentConsole } from "@/components/facevisa/BrandAgentConsole";
+import { CreatorHome } from "@/components/facevisa/CreatorHome";
 import { useAuth } from "@/components/site/Auth";
 import { SignIn } from "@/components/site/SignIn";
 
@@ -20,10 +20,10 @@ export default function DashboardPage() {
 
   if (!user) {
     return (
-      <AppPage title="Dashboard" description="Sign in to license a creator as a brand, or to put your own face on Likeness.">
+      <AppPage title="Dashboard" description="Sign in to license a creator as a brand, or to put your own face on FaceVisa.">
         <Card>
-          <p className="m-0 text-[14px] text-grey">Sign in to license a creator as a brand, or to put your own face on Likeness as a creator. One account has both. Creators complete a World ID check before they&apos;re listed.</p>
-          {demo && <p className="m-0 text-[14px] text-grey">This is the public demo: payments are testnet USDC, and your capture and the ads made of you are deleted after {demo.retentionHours} hours.</p>}
+          <p className="m-0 text-[14px] text-grey">Sign in to license a creator as a brand, or to put your own face on FaceVisa as a creator. One account has both. Creators complete a World ID check before they&apos;re listed.</p>
+          {demo && <p className="m-0 text-[14px] text-grey">This is the public demo: payments are testnet stablecoins, and your capture and the ads made of you are deleted after {demo.retentionHours} hours.</p>}
           <div>
             <SignIn light />
           </div>
