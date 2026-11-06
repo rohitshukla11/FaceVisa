@@ -99,7 +99,7 @@ In FaceVisa this happens on its own: approve an ad, and within a minute its rece
 
 ## In the demo video
 
-TODO (Rohit): the time, `[mm:ss]`. We approve a showcase ad as the creator, open Verify, and follow "On Swarm ↗": the
+The demo video is on our [ETHGlobal project page](https://ethglobal.com/showcase/facevisa-m5ee9). The Swarm moment: we approve a showcase ad as the creator, open Verify, and follow "On Swarm ↗": the
 gateway shows the same ad, and the verifier marks it "✓ same bytes as this file". Then we open the receipt on the
 Arkiv explorer and point at `swarm_ref`.
 

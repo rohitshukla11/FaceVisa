@@ -7,7 +7,7 @@ unless marked IST.
 ## IDKit
 
 Proof of Presence (World ID's Selfie Check) through IDKit 4, before a creator's face is listed for paid licensing.
-Why this credential, and every path: [README](README.md#world-id-idkit-proof-of-presence-before-a-face-is-listed).
+Why this credential, and every path: [README](README.md#world-id-one-real-person-one-listed-face).
 
 ### The debrief
 
