@@ -12,7 +12,7 @@ export const CATEGORIES = ["Fashion", "Beauty", "Food & drink", "Alcohol", "Gamb
 export type Category = (typeof CATEGORIES)[number];
 export type Kind = "image" | "video";
 
-/** A video costs this many times the creator's per-image price (an 8 s clip is more of their likeness). */
+/** A video costs this many times the creator's per-image price (an 8 s clip is more of their face). */
 export const VIDEO_MULTIPLIER = 3;
 /**
  * The longest licence a creator can allow, in days. 180 so that Arkiv itself ends every licence: an entity lives at

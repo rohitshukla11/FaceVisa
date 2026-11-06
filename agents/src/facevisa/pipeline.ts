@@ -26,7 +26,7 @@ import sharp from "sharp";
 import { ffmpegPath, geminiImage, labelImage, labelVideo, motionPrompt, stillPrompt, VIDEO_SECONDS } from "../ai/generate.js";
 import { imageToVideo, models } from "../ai/vertex.js";
 import type { RenderStore } from "../app/store.js";
-import type { AiCaps, LikenessData, Licence, Output, Payment, PendingAction } from "./data.js";
+import type { AiCaps, FaceVisaData, Licence, Output, Payment, PendingAction } from "./data.js";
 import { usd, type Kind } from "./rules.js";
 
 export type Photo = { bytes: Uint8Array; mime: string };
@@ -63,7 +63,7 @@ export interface ConsentCheckpoint {
 export class DevConsent implements ConsentCheckpoint {
   readonly name = "dev" as const;
   constructor(
-    private readonly data: LikenessData,
+    private readonly data: FaceVisaData,
     private readonly onApproved: (actionId: string) => void,
   ) {}
   opened(a: PendingAction) {
@@ -103,7 +103,7 @@ export class PaymentPending extends Error {
 /** Records the authorization and settlement in our database; no money moves. Hedera x402 replaces it. */
 export class DevPayment implements PaymentRail {
   readonly name = "dev";
-  constructor(private readonly data: LikenessData) {}
+  constructor(private readonly data: FaceVisaData) {}
   async authorize(p: { action: PendingAction; amount: number }) {
     return this.data.authorizePayment({ actionId: p.action.id, brand: p.action.brand, amount: p.amount, rail: this.name });
   }
@@ -177,7 +177,7 @@ export function testProvider(): AiProvider {
       return { bytes: new Uint8Array(bytes), mime: "image/jpeg", provenance: { provider: "test", model: "test-render (no AI)", requestId: null } };
     },
     async generateVideo(fromImage) {
-      const dir = mkdtempSync(join(tmpdir(), "likeness-test-video-"));
+      const dir = mkdtempSync(join(tmpdir(), "facevisa-test-video-"));
       try {
         writeFileSync(join(dir, "still.jpg"), await sharp(fromImage.bytes).resize(1280, 720, { fit: "cover" }).jpeg().toBuffer());
         await run(ffmpegPath(), ["-y", "-loop", "1", "-i", join(dir, "still.jpg"), "-t", "2", "-r", "12", "-vf", "format=yuv420p", "-c:v", "libx264", "-movflags", "+faststart", join(dir, "out.mp4")], { timeout: 60_000 });
@@ -206,7 +206,7 @@ export const noFaceCheck: FaceCheck = { name: "none", check: async () => ({ ran:
 export const promptsFor = (kind: Kind, brief: string) => ({ still: stillPrompt(brief, kind), motion: kind === "video" ? motionPrompt(brief) : undefined });
 
 export interface PipelineDeps {
-  data: LikenessData;
+  data: FaceVisaData;
   payment: PaymentRail;
   ai: AiProvider;
   face: FaceCheck;
@@ -221,7 +221,7 @@ export interface PipelineDeps {
   reviewTtlMs: number;
   /** Daily caps on billed model calls, per brand and across the site. */
   aiCaps: AiCaps;
-  /** Development only (likeness-eth-dev): every licence lasts this long instead of its days, to watch expiry live. */
+  /** Development only (facevisa-dev): every licence lasts this long instead of its days, to watch expiry live. */
   licenceMs?: number | undefined;
 }
 

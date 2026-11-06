@@ -1,5 +1,5 @@
 /**
- * In-app approvals: the signed-in person confirms the decision in Likeness. Two of them, the same rules as before:
+ * In-app approvals: the signed-in person confirms the decision in FaceVisa. Two of them, the same rules as before:
  *
  * - creator: the creator sees the FINISHED ad (not released) and approves, rejects (one regeneration) or denies it.
  *   An approval names the exact file the page showed (its hash): if the ad changed, it's refused. The approval is
@@ -11,18 +11,20 @@
  * creator decides the ad, only its brand decides the spend. Nothing is released or paid without the recorded approval
  * (pipeline.release refuses with 403). Deny, expiry and cancel release nothing and charge nothing.
  *
- * Labels: "approved by the creator in Likeness", "spend approved by the brand". Never World ID: World ID appears
+ * Labels: "approved by the creator in FaceVisa", "spend approved by the brand". Never World ID: World ID appears
  * only as the IDKit check before a creator lists (presence.ts).
  */
 import { randomBytes } from "node:crypto";
 import type { Accounts } from "./accounts.js";
-import type { BrandAgent } from "../likeness/brandAgent.js";
-import type { Evidence, LikenessData, PendingAction, Stage } from "../likeness/data.js";
-import { approvalHashOf, type ConsentCheckpoint } from "../likeness/pipeline.js";
-import { parseUsd, usd } from "../likeness/rules.js";
+import type { BrandAgent } from "../facevisa/brandAgent.js";
+import type { Evidence, FaceVisaData, PendingAction, Stage } from "../facevisa/data.js";
+import { approvalHashOf, type ConsentCheckpoint } from "../facevisa/pipeline.js";
+import { parseUsd, usd } from "../facevisa/rules.js";
 
-/** What an in-app approval records as its evidence (acr): the signed-in person confirmed it in Likeness. */
-export const IN_APP = "likeness-in-app";
+/** What an in-app approval records as its evidence (acr): the signed-in person confirmed it in FaceVisa. */
+export const IN_APP = "facevisa-in-app";
+/** In-app approval evidence, including approvals recorded with the legacy acr ("likeness-in-app"). */
+export const isInApp = (acr: string | null | undefined) => acr === IN_APP || acr === "likeness-in-app";
 
 export class ApprovalError extends Error {
   constructor(
@@ -38,7 +40,7 @@ export class ApprovalError extends Error {
 const OPEN: Record<Stage, PendingAction["status"][]> = { creator: ["review", "verified"], spend: ["spend_review", "spend_verified"] };
 
 export interface ApprovalDeps {
-  data: LikenessData;
+  data: FaceVisaData;
   accounts: Accounts;
   agent: BrandAgent;
 }
@@ -90,7 +92,7 @@ export class Approvals implements ConsentCheckpoint {
     } else {
       const reason = decision === "reject" ? "the creator rejected the regenerated ad too" : "the creator denied the request";
       if (!this.d.data.transition(a.id, OPEN.creator, "denied", { reason })) throw new ApprovalError(409, "this request changed; reload it");
-      this.d.data.log({ brand: a.brand, actionId: a.id, licenceId: null, kind: "denied", summary: `${reason} in Likeness: nothing released, nothing charged` });
+      this.d.data.log({ brand: a.brand, actionId: a.id, licenceId: null, kind: "denied", summary: `${reason} in FaceVisa: nothing released, nothing charged` });
     }
     return this.d.data.action(a.id)!;
   }

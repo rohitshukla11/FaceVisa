@@ -1,15 +1,15 @@
 /**
- * The data-access layer for Likeness's own records: creator listings (rules), licence requests and their finished-ad
+ * The data-access layer for FaceVisa's own records: creator listings (rules), licence requests and their finished-ad
  * approvals (pending actions), licences, payments, render receipts and the brand agent's activity log. SQLite now
  * (the same database and connection as accounts, so one transaction covers both); the interface is what Arkiv
  * replaces later for the public parts. The backend stays the authority: nothing here trusts the browser.
  *
  * A request's life: generating → review (the finished ad, not released) → verified → approved (the creator approves
- * that exact output, brand, usage, duration and price, in Likeness: app/approval.ts records it and approves at once)
+ * that exact output, brand, usage, duration and price, in FaceVisa: app/approval.ts records it and approves at once)
  * → [spend_review → spend_verified → approved: the brand approves the spend, when the price is over its limit] →
  * paying → released (licence + receipt). Or: denied, expired, cancelled, failed. A rejection regenerates once.
  */
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
 import type { Category, CreatorRules, Kind } from "./rules.js";
 
@@ -172,7 +172,7 @@ export interface AiCaps {
 export type DataChange = { kind: "listing"; uid: string } | { kind: "request"; id: string } | { kind: "licence"; id: string } | { kind: "receipt"; hash: string };
 
 /** What the brand agent, the pipeline and the Agent Pass checkpoints need. SQLite is the authority; Arkiv mirrors it. */
-export interface LikenessData {
+export interface FaceVisaData {
   /** Called after each committed change to a listing, request, licence or receipt; never breaks the change itself. */
   onChange?: ((c: DataChange) => void) | undefined;
   /** Told after each agent event is logged (the Hedera audit log); its failure never fails the event. */
@@ -216,9 +216,13 @@ export interface LikenessData {
 
   authorizePayment(p: { actionId: string; brand: string; amount: number; rail: string; ref?: string; payer?: string; payee?: string }): Payment;
   settlePayment(id: string, ref: string): void;
+  /** A payment's reference once it's known but before it's confirmed (a transaction hash, recorded before it's sent). */
+  setPaymentRef(id: string, ref: string): void;
   voidPayment(id: string): void;
   payment(id: string): Payment | undefined;
   payments(by: { brand?: string; actionId?: string }): Payment[];
+  /** Not voided on a rail today (UTC), micro-USD: the rail's own daily cap (Whitechain's settlement cap). */
+  railTotalToday(rail: string): number;
   /** Payments on a rail still authorized (not settled or voided): an outcome to find out, e.g. after a restart. */
   unsettled(rail: string): Payment[];
   /** Authorized or settled today (UTC) by this brand, micro-USD. */
@@ -238,7 +242,7 @@ export interface LikenessData {
   events(brand: string, limit?: number): AgentEvent[];
 }
 
-/** Bumped when these tables change shape: older (pre-release) Likeness tables are dropped and made again. */
+/** Bumped when these tables change shape: older (pre-release) FaceVisa tables are dropped and made again. */
 const SCHEMA_VERSION = "2";
 const TABLES = ["listings", "pending_actions", "licence_records", "payments", "render_receipts", "agent_events"];
 
@@ -279,6 +283,11 @@ create index if not exists pending_actions_brand on pending_actions (brand, crea
 `;
 
 const newId = (prefix: string) => `${prefix}_${randomBytes(8).toString("hex")}`;
+/**
+ * A request's licence ID, known before it's paid for (one licence per request): a Whitechain payment names the licence
+ * it pays for, and the licence created at release carries the same ID.
+ */
+export const licenceIdFor = (actionId: string) => `lic_${createHash("sha256").update(`licence:${actionId}`).digest("hex").slice(0, 16)}`;
 const dayStart = (now = Date.now()) => Date.UTC(new Date(now).getUTCFullYear(), new Date(now).getUTCMonth(), new Date(now).getUTCDate());
 const EMPTY: Checkpoint = { attemptState: null, attemptStartedAt: null, evidence: null, decidedAt: null };
 const WAITING: ActionStatus[] = ["review", "verified", "approved", "spend_review", "spend_verified"];
@@ -342,7 +351,7 @@ const paymentRow = (r: Row): Payment => ({
   settledAt: r.settled_at == null ? null : Number(r.settled_at),
 });
 
-export class SqliteLikenessData implements LikenessData {
+export class SqliteFaceVisaData implements FaceVisaData {
   onChange: ((c: DataChange) => void) | undefined;
   onEvent: ((e: AgentEvent) => void) | undefined;
 
@@ -385,7 +394,7 @@ export class SqliteLikenessData implements LikenessData {
     try {
       this.onChange(c);
     } catch (e) {
-      console.error(`[likeness] change listener failed: ${(e as Error).name}`);
+      console.error(`[facevisa] change listener failed: ${(e as Error).name}`);
     }
     return ok;
   }
@@ -427,7 +436,7 @@ export class SqliteLikenessData implements LikenessData {
 
   // ---------------------------------------------------------------- actions
 
-  createAction(a: Parameters<LikenessData["createAction"]>[0]): PendingAction {
+  createAction(a: Parameters<FaceVisaData["createAction"]>[0]): PendingAction {
     const id = newId("req");
     this.db
       .prepare(
@@ -527,7 +536,7 @@ export class SqliteLikenessData implements LikenessData {
       lic = this.tx(() => {
         const a = this.action(id);
         if (!a || a.status !== "paying" || !a.output || !a.approvalHash) return undefined;
-        const lid = newId("lic");
+        const lid = licenceIdFor(id);
         const now = Date.now();
         this.db
           .prepare(
@@ -582,6 +591,15 @@ export class SqliteLikenessData implements LikenessData {
 
   unsettled(rail: string) {
     return (this.db.prepare("select * from payments where rail = ? and status = 'authorized' order by created_at").all(rail) as Row[]).map(paymentRow);
+  }
+
+  railTotalToday(rail: string) {
+    const start = new Date(new Date().toISOString().slice(0, 10) + "T00:00:00Z").getTime();
+    return Number((this.db.prepare("select coalesce(sum(amount), 0) as n from payments where rail = ? and status != 'voided' and created_at >= ?").get(rail, start) as { n: number }).n);
+  }
+
+  setPaymentRef(id: string, ref: string) {
+    this.db.prepare("update payments set ref = ? where id = ? and status = 'authorized'").run(ref, id);
   }
 
   settlePayment(id: string, ref: string) {
@@ -643,7 +661,7 @@ export class SqliteLikenessData implements LikenessData {
     try {
       this.onEvent?.(event);
     } catch (err) {
-      console.error(`[likeness] event listener failed: ${(err as Error).name}`);
+      console.error(`[facevisa] event listener failed: ${(err as Error).name}`);
     }
     return event;
   }

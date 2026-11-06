@@ -4,7 +4,7 @@
  * "funder" (holds tGLM and tops up account keys before their first write).
  *
  * One git-ignored file per mode, keystores/<mode>/keystore.json (mode 600). Each key is sealed with AES-256-GCM under
- * a key derived by scrypt from the password in LIKENESS_KEYSTORE_PASSWORD_FILE, with its name and address as the
+ * a key derived by scrypt from the password in FACEVISA_KEYSTORE_PASSWORD_FILE, with its name and address as the
  * additional data, so a sealed key can't be moved to another name or address. A sealed check value makes a wrong
  * password fail at open. Private keys leave this module only inside a viem account: never in .env, logs or output.
  */
@@ -25,6 +25,7 @@ interface KeystoreFile { version: 1; kdf: { name: "scrypt"; salt: string } & Scr
 /** 2^17 is what Ethereum's own keystores use (~128 MiB, ~0.3 s); paid once per open. */
 const DEFAULT_SCRYPT: ScryptParams = { N: 2 ** 17, r: 8, p: 1 };
 const NAME = /^(platform|account|wallet):[A-Za-z0-9_-]{1,64}$/;
+// A stored-format constant: it must never change (existing keystores are checked against it).
 const CHECK = "likeness-keystore-v1";
 
 export class Keystore {
@@ -130,6 +131,15 @@ export class Keystore {
     return this.ensure(`account:${uid}`);
   }
 
+  /**
+   * The wallet an account's brand workspace pays from, apart from its account key (where its creator profile is paid):
+   * one account holds both workspaces, so a brand can license its own creator profile and real USDT still moves
+   * between two addresses. Generated on its first need.
+   */
+  brandWalletKey(uid: string) {
+    return this.ensure(`wallet:brand-${uid}`);
+  }
+
   private seal(plain: Buffer, additional: string): Sealed {
     const iv = randomBytes(12);
     const c = createCipheriv("aes-256-gcm", this.key, iv).setAAD(Buffer.from(additional));
@@ -192,14 +202,14 @@ function writeKeystore(path: string, f: KeystoreFile) {
 export function readPasswordFile(file: string, root: string): string {
   const path = isAbsolute(file) ? file : resolve(root, file);
   const st = statSync(path, { throwIfNoEntry: false });
-  if (!st?.isFile()) throw new Error("LIKENESS_KEYSTORE_PASSWORD_FILE: no such file");
-  if (st.mode & 0o077) throw new Error("LIKENESS_KEYSTORE_PASSWORD_FILE: readable by others (chmod 600 it)");
+  if (!st?.isFile()) throw new Error("FACEVISA_KEYSTORE_PASSWORD_FILE: no such file");
+  if (st.mode & 0o077) throw new Error("FACEVISA_KEYSTORE_PASSWORD_FILE: readable by others (chmod 600 it)");
   return readFileSync(path, "utf8").replace(/\r?\n$/, "");
 }
 
-/** The keystore of this mode, or undefined when LIKENESS_KEYSTORE_PASSWORD_FILE isn't set. */
+/** The keystore of this mode, or undefined when FACEVISA_KEYSTORE_PASSWORD_FILE isn't set. */
 export function keystoreFromEnv(root: string, mode: string): Keystore | undefined {
-  const file = process.env.LIKENESS_KEYSTORE_PASSWORD_FILE;
+  const file = process.env.FACEVISA_KEYSTORE_PASSWORD_FILE;
   if (!file) return undefined;
   return Keystore.open(keystorePath(root, mode), readPasswordFile(file, root));
 }

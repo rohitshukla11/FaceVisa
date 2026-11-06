@@ -1,7 +1,7 @@
 /**
- * The public demo (LIKENESS_PUBLIC_DEMO=1): the deployed server, for judges who can't sign in with World ID yet. Demo
+ * The public demo (FACEVISA_PUBLIC_DEMO=1): the deployed server, for judges who can't sign in with World ID yet. Demo
  * identities come from a second issuer (standin.ts, flavour "demo") next to real World ID, in their own Arkiv
- * namespace (likeness-eth-public), labelled "demo" everywhere. This module holds what the demo adds on top:
+ * namespace (facevisa-public), labelled "demo" everywhere. This module holds what the demo adds on top:
  *
  * - Daily limits per visitor (new demo people, images, videos), keyed by an HMAC of the IP that changes every day, so
  *   no IP address is stored. They live in the database: a restart doesn't reset them.
@@ -18,9 +18,9 @@ import type { DatabaseSync } from "node:sqlite";
 import type { Accounts } from "./accounts.js";
 import { DEMO_PATH } from "./standin.js";
 import type { RenderStore } from "./store.js";
-import type { LikenessData } from "../likeness/data.js";
+import type { FaceVisaData } from "../facevisa/data.js";
 
-export const publicDemoWanted = (env = process.env) => env.LIKENESS_PUBLIC_DEMO === "1";
+export const publicDemoWanted = (env = process.env) => env.FACEVISA_PUBLIC_DEMO === "1";
 export const DEMO_RETENTION_MS = 48 * 3600 * 1000;
 
 /**
@@ -45,8 +45,8 @@ export interface DemoConfig {
 const int = (v: string | undefined, d: number) => (v !== undefined && v !== "" && Number.isInteger(Number(v)) && Number(v) >= 0 ? Number(v) : d);
 export function demoConfigFromEnv(env = process.env): DemoConfig {
   return {
-    perIp: { identity: int(env.LIKENESS_DEMO_IP_IDENTITIES, 3) },
-    hederaAccountsPerDay: int(env.LIKENESS_DEMO_HEDERA_ACCOUNTS, 30),
+    perIp: { identity: int(env.FACEVISA_DEMO_IP_IDENTITIES, 3) },
+    hederaAccountsPerDay: int(env.FACEVISA_DEMO_HEDERA_ACCOUNTS, 30),
     topUpUnits: 300_000n,
     topUpPerBrand: 1_000_000n,
     topUpPerDay: 5_000_000n,
@@ -150,7 +150,7 @@ export class Demo {
    * The 48-hour rule: a demo creator's capture (photos on disk, cleared on the profile, and unlisted) and every ad made
    * of a demo creator, 48 hours after each was made. Seeded creators are kept. Returns what it deleted.
    */
-  cleanup(o: { accounts: Accounts; data: LikenessData; store: RenderStore; photosDir: string; log?: (line: string) => void }): { captures: number; ads: number } {
+  cleanup(o: { accounts: Accounts; data: FaceVisaData; store: RenderStore; photosDir: string; log?: (line: string) => void }): { captures: number; ads: number } {
     const cutoff = this.now() - DEMO_RETENTION_MS;
     const log = o.log ?? ((l: string) => console.log(l));
     const demoCreator = (uid: string) => isPublicAccount(o.accounts.account(uid)?.iss) && !this.kept(uid);

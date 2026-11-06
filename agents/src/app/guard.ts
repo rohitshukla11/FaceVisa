@@ -1,6 +1,6 @@
 /**
- * The public server's guards (LIKENESS_PUBLIC=1, behind a reverse proxy): every client IP is rate limited for reads
- * and for actions. Spending limits are per brand, in the Likeness data layer and the pipeline.
+ * The public server's guards (FACEVISA_PUBLIC=1, behind a reverse proxy): every client IP is rate limited for reads
+ * and for actions. Spending limits are per brand, in the FaceVisa data layer and the pipeline.
  */
 import type { IncomingMessage } from "node:http";
 
@@ -27,7 +27,7 @@ export interface Guard {
 }
 
 export function guardFromEnv(): Guard | undefined {
-  if (process.env.LIKENESS_PUBLIC !== "1") return undefined;
+  if (process.env.FACEVISA_PUBLIC !== "1") return undefined;
   return { reads: new RateLimit(300), actions: new RateLimit(30) };
 }
 

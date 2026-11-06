@@ -1,8 +1,8 @@
 /**
  * Accounts on this server (World ID sign-in, keyed on the ID token's (iss, sub)), their sessions and single-use World ID
  * attempts, and each account's creator profile (photo with consent, optional YouTube channel). One World ID is one
- * account with both a creator profile and a brand workspace. SQLite on disk; Likeness's own records (listings,
- * requests, licences) are in likeness/data.ts on the same connection.
+ * account with both a creator profile and a brand workspace. SQLite on disk; FaceVisa's own records (listings,
+ * requests, licences) are in facevisa/data.ts on the same connection.
  */
 import { createHash } from "node:crypto";
 import { mkdirSync } from "node:fs";
@@ -107,7 +107,7 @@ export interface OidcAttempt {
 }
 
 export class Accounts {
-  /** Shared with the Likeness data layer (likeness/data.ts), so one transaction can span both. */
+  /** Shared with the FaceVisa data layer (facevisa/data.ts), so one transaction can span both. */
   readonly db: DatabaseSync;
 
   /** file: a path on disk, or ":memory:". */

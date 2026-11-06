@@ -14,7 +14,7 @@
  */
 import { readFileSync, statSync } from "node:fs";
 import { isAbsolute, resolve } from "node:path";
-import type { AiOutput, AiProvider, Photo } from "../likeness/pipeline.js";
+import type { AiOutput, AiProvider, Photo } from "../facevisa/pipeline.js";
 
 export const ZEROG_BASE_URL = "https://router-api.0g.ai/v1";
 export const ZEROG_IMAGE_MODEL = "bytedance/seedream-5.0-flash";

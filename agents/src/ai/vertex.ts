@@ -1,8 +1,8 @@
 /**
  * Vertex AI over REST, without API keys, in the project VERTEX_PROJECT names and only that one: with no
- * VERTEX_PROJECT, real generation is off (TEST RENDERs), and likeness-hsk (another submission's project) is refused
+ * VERTEX_PROJECT, real generation is off (TEST RENDERs), and another submission's project is refused
  * outright, so nothing here ever runs or bills there. The access token comes from the GCP metadata server (a VM's
- * service account) or, on a developer's machine, from the gcloud configuration LIKENESS_GCLOUD_CONFIG names, else from
+ * service account) or, on a developer's machine, from the gcloud configuration FACEVISA_GCLOUD_CONFIG names, else from
  * Application Default Credentials. Every call names the project and sends it as the quota project.
  *   Gemini:  POST https://aiplatform.googleapis.com/v1/projects/{p}/locations/global/publishers/google/models/{m}:generateContent
  *   Veo:     POST https://us-central1-aiplatform.googleapis.com/v1/projects/{p}/locations/us-central1/publishers/google/models/{m}:predictLongRunning
@@ -14,17 +14,17 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 
 /**
- * Projects and gcloud configurations this app must never use: another submission's (likeness-hsk), and the account's
+ * Projects and gcloud configurations this app must never use: another submission's, and the account's
  * default project (bionic-carving-140911, which the gcloud configuration "default" points at).
  */
 export const FORBIDDEN_GCP = ["likeness-hsk", "bionic-carving-140911", "default"];
 
 /** Whether real generation is on, and in which project; or why it is off. */
 export function vertexStatus(): { on: true; project: string } | { on: false; reason: string } {
-  // Vertex is wanted when a media switch (or the video fallback) names it; unset switches follow LIKENESS_AI.
+  // Vertex is wanted when a media switch (or the video fallback) names it; unset switches follow FACEVISA_AI.
   const env = process.env;
-  const legacy = env.LIKENESS_AI === "vertex" ? "vertex" : "";
-  if (![env.LIKENESS_AI_IMAGE ?? legacy, env.LIKENESS_AI_VIDEO ?? legacy, env.LIKENESS_AI_VIDEO_FALLBACK].includes("vertex")) return { on: false, reason: "no media is set to vertex (LIKENESS_AI_IMAGE, LIKENESS_AI_VIDEO; legacy LIKENESS_AI)" };
+  const legacy = env.FACEVISA_AI === "vertex" ? "vertex" : "";
+  if (![env.FACEVISA_AI_IMAGE ?? legacy, env.FACEVISA_AI_VIDEO ?? legacy, env.FACEVISA_AI_VIDEO_FALLBACK].includes("vertex")) return { on: false, reason: "no media is set to vertex (FACEVISA_AI_IMAGE, FACEVISA_AI_VIDEO; legacy FACEVISA_AI)" };
   const project = process.env.VERTEX_PROJECT?.trim();
   if (!project) return { on: false, reason: "VERTEX_PROJECT isn't set" };
   return { on: true, project };
@@ -33,9 +33,9 @@ export function vertexStatus(): { on: true; project: string } | { on: false; rea
 /** Refuses to start with a forbidden project or gcloud configuration, whether or not generation is on. */
 export function assertVertexAllowed() {
   const project = process.env.VERTEX_PROJECT?.trim();
-  if (project && FORBIDDEN_GCP.includes(project)) throw new Error(`VERTEX_PROJECT=${project} is another project's: Likeness never calls Vertex there. Set this app's own project (or leave it empty for TEST RENDERs).`);
-  const config = process.env.LIKENESS_GCLOUD_CONFIG?.trim();
-  if (config && FORBIDDEN_GCP.includes(config)) throw new Error(`LIKENESS_GCLOUD_CONFIG=${config} belongs to another project: use this app's own gcloud configuration.`);
+  if (project && FORBIDDEN_GCP.includes(project)) throw new Error(`VERTEX_PROJECT=${project} is another project's: FaceVisa never calls Vertex there. Set this app's own project (or leave it empty for TEST RENDERs).`);
+  const config = process.env.FACEVISA_GCLOUD_CONFIG?.trim();
+  if (config && FORBIDDEN_GCP.includes(config)) throw new Error(`FACEVISA_GCLOUD_CONFIG=${config} belongs to another project: use this app's own gcloud configuration.`);
 }
 
 export const vertexProject = () => {
@@ -68,12 +68,12 @@ function assertAdcQuotaProject() {
   const file = process.env.GOOGLE_APPLICATION_CREDENTIALS || join(homedir(), ".config/gcloud/application_default_credentials.json");
   if (!existsSync(file)) return;
   const quota = (JSON.parse(readFileSync(file, "utf8")) as { quota_project_id?: string }).quota_project_id;
-  if (quota && quota !== vertexProject()) throw new Error(`Application Default Credentials name quota project ${quota}, not ${vertexProject()}: set LIKENESS_GCLOUD_CONFIG to this app's own gcloud configuration`);
+  if (quota && quota !== vertexProject()) throw new Error(`Application Default Credentials name quota project ${quota}, not ${vertexProject()}: set FACEVISA_GCLOUD_CONFIG to this app's own gcloud configuration`);
 }
 
 function gcloudToken(): { value: string; exp: number } {
   assertVertexAllowed();
-  const config = process.env.LIKENESS_GCLOUD_CONFIG?.trim();
+  const config = process.env.FACEVISA_GCLOUD_CONFIG?.trim();
   if (!config) assertAdcQuotaProject();
   // A named configuration, or Application Default Credentials; never gcloud's default configuration (another project's).
   const value = execFileSync("gcloud", config ? ["auth", "print-access-token"] : ["auth", "application-default", "print-access-token"], {

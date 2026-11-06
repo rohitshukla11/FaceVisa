@@ -2,11 +2,11 @@
  * Two small OpenID providers for sign-in, run by this backend (no World ID: World ID appears only as the IDKit check
  * before a creator lists):
  *
- * - "Dev sign-in" (flavour "standin"), for LOCAL DEVELOPMENT ONLY (LIKENESS_LOCAL_DEV=1 and WORLDID_STANDIN=1; never
+ * - "Dev sign-in" (flavour "standin"), for LOCAL DEVELOPMENT ONLY (FACEVISA_LOCAL_DEV=1 and WORLDID_STANDIN=1; never
  *   with NODE_ENV=production or on mainnet): pick a named person and click through, including cancel and an expired
  *   attempt. Its own issuer (`<backend>/api/dev/worldid`, a path kept from before so existing local accounts still sign
  *   in); identity "dev" everywhere.
- * - The public demo's identities (flavour "demo", LIKENESS_PUBLIC_DEMO=1, `<backend>/api/demo/id`): each sign-in is a
+ * - The public demo's identities (flavour "demo", FACEVISA_PUBLIC_DEMO=1, `<backend>/api/demo/id`): each sign-in is a
  *   new person with a random subject (no names, no list of people, so nobody can sign in as someone else), and new
  *   people are rate limited per IP. Identity "demo" everywhere.
  *
@@ -62,7 +62,7 @@ export class StandIn {
   constructor(private readonly o: { internalBase: string; publicBase: string; flavour?: "standin" | "demo"; newPerson?: (ip: string) => boolean }) {
     this.demo = o.flavour === "demo";
     this.path = this.demo ? DEMO_PATH : STANDIN_PATH;
-    this.clientId = this.demo ? "likeness-public-demo" : "likeness-local-standin";
+    this.clientId = this.demo ? "facevisa-public-demo" : "facevisa-local-standin";
     this.issuer = `${o.internalBase}${this.path}`;
     this.key = generateKeyPairSync("rsa", { modulusLength: 2048 }).privateKey;
     this.client = new WorldId({ issuer: this.issuer, clientId: this.clientId, clientSecret: this.secret });
@@ -173,12 +173,12 @@ ${button("cancel", SCENARIOS.cancel, "bad")}${button("expired", SCENARIOS.expire
 
   /** The public demo's sign-in page: a new demo person each time. */
   private demoPage(_rt: Runtime, res: ServerResponse, p: URLSearchParams): true {
-    const html = (status: number, body: string) => this.html(res, status, body, "Likeness demo identity");
+    const html = (status: number, body: string) => this.html(res, status, body, "FaceVisa demo identity");
     const problem = this.problem(p, this.allowedRedirects());
-    if (problem) return html(400, `<h1>Likeness demo identity</h1><p class="warn">Refused: ${esc(problem)}.</p>`);
+    if (problem) return html(400, `<h1>FaceVisa demo identity</h1><p class="warn">Refused: ${esc(problem)}.</p>`);
     const hidden = [...p.entries()].map(([k, v]) => `<input type="hidden" name="${esc(k)}" value="${esc(v)}">`).join("");
     const button = (choice: string, label: string, cls = "") => `<form method="post" action="${this.path}/authorize">${hidden}<input type="hidden" name="choice" value="${choice}"><button class="${cls}">${esc(label)}</button></form>`;
-    const head = `<h1>Likeness demo identity</h1><p class="warn"><b>Demo mode: a test identity.</b> It lets you try Likeness without an account. Everything it does is labelled "demo", on the site and on Arkiv. Payments are on testnet.</p>`;
+    const head = `<h1>FaceVisa demo identity</h1><p class="warn"><b>Demo mode: a test identity.</b> It lets you try FaceVisa without an account. Everything it does is labelled "demo", on the site and on Arkiv. Payments are on testnet.</p>`;
     return html(200, `${head}<div class="card"><h2>Sign in</h2><p>Each time you continue here you're a new demo person. You choose a display name on the next page.</p>${button("ok", "Continue as a new demo person", "primary")}${button("cancel", "Cancel", "bad")}</div>`);
   }
 
@@ -193,7 +193,7 @@ ${button("cancel", SCENARIOS.cancel, "bad")}${button("expired", SCENARIOS.expire
     back.searchParams.set("iss", this.issuer);
     if (p.get("choice") === "cancel") {
       back.searchParams.set("error", "access_denied");
-      back.searchParams.set("error_description", "Cancelled at the Likeness demo identity");
+      back.searchParams.set("error_description", "Cancelled at the FaceVisa demo identity");
       return redirect(back.toString());
     }
     // Always a new random person: never a subject typed into the form or asked for by anyone.

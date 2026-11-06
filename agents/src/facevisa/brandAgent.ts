@@ -1,5 +1,5 @@
 /**
- * The brand's agent: the one real agent in Likeness. "Agents negotiate. Only the human consents to their face being
+ * The brand's agent: the one real agent in FaceVisa. "Agents negotiate. Only the human consents to their face being
  * used."
  *
  * The brand sets a brief, usage (category), duration, a maximum price and a budget. The agent shortlists listed
@@ -9,7 +9,7 @@
  * Every step goes to the brand's Agent activity log; budget limits are enforced here and in the pipeline.
  */
 import { createHash } from "node:crypto";
-import type { Licence, LikenessData, Listing, PendingAction } from "./data.js";
+import type { Licence, FaceVisaData, Listing, PendingAction } from "./data.js";
 import { PipelineError, type ConsentCheckpoint, type Pipeline } from "./pipeline.js";
 import { checkAsk, platformProblems, pricePerRender, usd, type Category, type Kind, type LicenceAsk } from "./rules.js";
 
@@ -32,7 +32,7 @@ export interface ShortlistEntry {
   reason: string;
   youtube?: CreatorInfo;
   /** Where the creator's listing came from: their entity on Arkiv, or the backend (not yet confirmed on Arkiv). */
-  source?: "arkiv" | "likeness";
+  source?: "arkiv" | "facevisa";
   entityKey?: string;
   url?: string;
   why?: string;
@@ -43,7 +43,7 @@ export interface ShortlistEntry {
 }
 
 /** A listing with where it was read from (arkiv/reads.ts); `fits` is whether Arkiv's query of fitting listings had it. */
-export type ShortlistListing = Listing & { source?: "arkiv" | "likeness"; fits?: boolean; entityKey?: string; url?: string; why?: string };
+export type ShortlistListing = Listing & { source?: "arkiv" | "facevisa"; fits?: boolean; entityKey?: string; url?: string; why?: string };
 
 /** What the agent may know about a creator beyond their rules: a verified YouTube channel, if linked. */
 export interface CreatorInfo {
@@ -66,7 +66,7 @@ export function briefHash(a: { brief: string; category: Category; kind: Kind; pr
 }
 
 export interface BrandAgentDeps {
-  data: LikenessData;
+  data: FaceVisaData;
   pipeline: Pipeline;
   /** Set after construction (the consent checkpoint calls back into the agent). */
   consent?: ConsentCheckpoint;
@@ -183,7 +183,7 @@ export class BrandAgent {
   /** Generates the ad, then hands it to the creator's consent checkpoint and waits. */
   async generate(actionId: string) {
     const a = await this.d.pipeline.generate(actionId);
-    this.d.data.log({ brand: a.brand, actionId: a.id, licenceId: null, kind: "waiting", summary: `waiting for ${this.d.creatorName(a.creator)} to review and approve the finished ${a.kind} in Likeness (until ${new Date(a.expiresAt).toISOString().slice(11, 16)} UTC)` });
+    this.d.data.log({ brand: a.brand, actionId: a.id, licenceId: null, kind: "waiting", summary: `waiting for ${this.d.creatorName(a.creator)} to review and approve the finished ${a.kind} in FaceVisa (until ${new Date(a.expiresAt).toISOString().slice(11, 16)} UTC)` });
     this.d.consent!.opened(a);
     return this.d.data.action(a.id)!;
   }
@@ -205,9 +205,9 @@ export class BrandAgent {
   onApproved(actionId: string) {
     const a = this.d.data.action(actionId);
     if (!a) return;
-    this.d.data.log({ brand: a.brand, actionId, licenceId: null, kind: "approved", summary: `${this.d.creatorName(a.creator)} approved this exact ${a.kind}${a.creatorCheck.evidence?.iss === "dev-consent" ? " (DevConsent: local development, approved at once)" : " in Likeness"}` });
+    this.d.data.log({ brand: a.brand, actionId, licenceId: null, kind: "approved", summary: `${this.d.creatorName(a.creator)} approved this exact ${a.kind}${a.creatorCheck.evidence?.iss === "dev-consent" ? " (DevConsent: local development, approved at once)" : " in FaceVisa"}` });
     if (a.status === "spend_review") {
-      this.d.data.log({ brand: a.brand, actionId, licenceId: null, kind: "spend-check", summary: `${usd(a.price)} is over this workspace's limit of ${usd(this.d.spendLimit!)}: paused until the brand approves the spend in Likeness` });
+      this.d.data.log({ brand: a.brand, actionId, licenceId: null, kind: "spend-check", summary: `${usd(a.price)} is over this workspace's limit of ${usd(this.d.spendLimit!)}: paused until the brand approves the spend in FaceVisa` });
       return;
     }
     if (this.d.autoRun) this.autoRelease(actionId, a.brand);

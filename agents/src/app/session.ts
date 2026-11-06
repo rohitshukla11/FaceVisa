@@ -7,7 +7,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import type { Account, Accounts } from "./accounts.js";
 import { randomToken } from "./worldid.js";
 
-export const SESSION_COOKIE = "likeness_session";
+export const SESSION_COOKIE = "facevisa_session";
 export const SESSION_TTL_MS = 7 * 24 * 3600 * 1000;
 
 function secret(): string {

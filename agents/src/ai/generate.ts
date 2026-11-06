@@ -1,8 +1,8 @@
 /**
- * AI ads of a licensed creator (Vertex AI, project likeness-hsk), as in likeness-ai (Rohit's earlier
- * project): Gemini image generation with the creator's consented photo as the subject reference; for
+ * AI ads of a licensed creator (Vertex AI, this app's own project), as in Rohit's earlier
+ * project: Gemini image generation with the creator's consented photo as the subject reference; for
  * video, a still made that way becomes the first frame of a Veo 3.1 Lite clip (8 s, 720p, silent).
- * Every output carries a visible "AI-generated · licensed via Likeness" label, burned into the pixels
+ * Every output carries a visible "AI-generated · licensed via FaceVisa" label, burned into the pixels
  * (sharp for images, ffmpeg for video), so the receipt's sha256 covers the labelled file.
  */
 import { accessSync, chmodSync, constants, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -35,8 +35,8 @@ const LABEL = fileURLToPath(new URL("../../assets/ai-label.png", import.meta.url
 /** The brief, then the rules that keep the creator faithful and the frame clean. */
 export function stillPrompt(brief: string, purpose: "image" | "video"): string {
   return [
-    "The image shows one real, consenting adult who has licensed their likeness for this advertising image.",
-    "Generate a new photorealistic image of exactly this person, keeping their face, identity and likeness faithful to the reference photo.",
+    "The image shows one real, consenting adult who has licensed their face for this advertising image.",
+    "Generate a new photorealistic image of exactly this person, keeping their face, identity and appearance faithful to the reference photo.",
     "Their face is clearly visible, unobstructed and well lit; one person only.",
     purpose === "video" ? "Compose it as the opening frame of a short video ad: landscape 16:9, the person in the centre third with space around them." : "Square advertising photo, the person as the clear subject.",
     "Do not add any text, logos, captions or watermarks.",
@@ -104,7 +104,7 @@ export function ffmpegPath() {
 
 /** The same label on every frame of the video (H.264, silent, fast start). */
 export async function labelVideo(mp4: Uint8Array): Promise<Uint8Array> {
-  const dir = mkdtempSync(join(tmpdir(), "likeness-video-"));
+  const dir = mkdtempSync(join(tmpdir(), "facevisa-video-"));
   try {
     writeFileSync(join(dir, "in.mp4"), mp4);
     await run(
@@ -125,7 +125,7 @@ export async function labelVideo(mp4: Uint8Array): Promise<Uint8Array> {
 
 /** A frame one second in, as a JPEG: the video's poster in galleries. */
 export async function videoPoster(mp4: Uint8Array): Promise<Uint8Array> {
-  const dir = mkdtempSync(join(tmpdir(), "likeness-poster-"));
+  const dir = mkdtempSync(join(tmpdir(), "facevisa-poster-"));
   try {
     writeFileSync(join(dir, "in.mp4"), mp4);
     await run(ffmpegPath(), ["-y", "-ss", "1", "-i", join(dir, "in.mp4"), "-frames:v", "1", "-vf", "scale=640:-2", "-q:v", "4", join(dir, "poster.jpg")], { timeout: 60_000 });

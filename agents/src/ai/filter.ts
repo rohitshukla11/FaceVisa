@@ -1,6 +1,6 @@
 /**
  * The brand's brief is checked before any licence or payment, and again before generating. Two layers
- * (as in likeness-ai, Rohit's earlier project): keyword rules for the five uses banned in the contract
+ * (as in facevisa-ai, Rohit's earlier project): keyword rules for the five uses banned in the contract
  * (political, adult, minors, impersonation, deception), always; then a Gemini classifier on Vertex AI
  * with JSON output: banned uses, and whether the brief fits the licensed use. If the classifier can't
  * answer, the brief is refused (fail closed).
@@ -27,7 +27,7 @@ export function ruleCheck(brief: string): string[] {
   return hits;
 }
 
-const INSTRUCTION = `You screen briefs for an AI ad generator that renders a real, consenting adult's likeness under a licence.
+const INSTRUCTION = `You screen briefs for an AI ad generator that renders a real, consenting adult's face under a licence.
 Banned uses, never allowed under any licence:
 - political: elections, candidates, parties, policy advocacy;
 - adult: sexual or sexualised content, nudity;

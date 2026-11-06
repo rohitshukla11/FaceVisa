@@ -3,7 +3,7 @@
  * taken in the browser with a blink-and-turn liveness check; no file uploads), stored only with the creator's explicit
  * consent, JPEG metadata stripped; the front frame is what the model is given, all three are what the face gate
  * compares against. Optionally, a verified YouTube channel (app/youtube.ts; never required to list). No wallet, no chain: the creator's
- * rules and every licence live in the Likeness data layer (likeness/data.ts).
+ * rules and every licence live in the FaceVisa data layer (facevisa/data.ts).
  */
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";

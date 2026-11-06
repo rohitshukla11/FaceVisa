@@ -1,32 +1,32 @@
 /**
  * Which provider makes each kind of media (B3):
- *   LIKENESS_AI_IMAGE = vertex | 0g      images, and a video's opening still
- *   LIKENESS_AI_VIDEO = vertex | 0g      the video, animated from that approved still (its first frame)
+ *   FACEVISA_AI_IMAGE = vertex | 0g      images, and a video's opening still
+ *   FACEVISA_AI_VIDEO = vertex | 0g      the video, animated from that approved still (its first frame)
  *   empty                                TEST RENDERs (no model call)
- *   unset                                the legacy LIKENESS_AI: `vertex` puts both on Vertex, anything else tests
+ *   unset                                the legacy FACEVISA_AI: `vertex` puts both on Vertex, anything else tests
  * An explicit choice must be usable (Vertex needs VERTEX_PROJECT; 0G needs .secrets/zerog-api-key), or startup
  * fails; the legacy alias falls back to TEST RENDERs as before. Daily caps count per media type, whichever provider
  * is billed.
  *
- * LIKENESS_AI_VIDEO_FALLBACK=vertex (optional): when 0G refuses a video (e.g. Seedance's real-person filter), make it
+ * FACEVISA_AI_VIDEO_FALLBACK=vertex (optional): when 0G refuses a video (e.g. Seedance's real-person filter), make it
  * on Vertex instead. Off by default: a refusal fails the request with "0G refused this video", never a silent switch.
  */
-import { testProvider, vertexProvider, type AiProvider } from "../likeness/pipeline.js";
+import { testProvider, vertexProvider, type AiProvider } from "../facevisa/pipeline.js";
 import { vertexStatus } from "./vertex.js";
 import { ZeroGError, zeroGConfigFromEnv, zeroGProvider } from "./zerog.js";
 
 export type MediaChoice = "vertex" | "0g" | "test";
 
 export function mediaChoices(env = process.env): { image: MediaChoice; video: MediaChoice; explicit: { image: boolean; video: boolean } } {
-  const legacy: MediaChoice = env.LIKENESS_AI === "vertex" ? "vertex" : "test";
-  const pick = (name: "LIKENESS_AI_IMAGE" | "LIKENESS_AI_VIDEO"): MediaChoice => {
+  const legacy: MediaChoice = env.FACEVISA_AI === "vertex" ? "vertex" : "test";
+  const pick = (name: "FACEVISA_AI_IMAGE" | "FACEVISA_AI_VIDEO"): MediaChoice => {
     const v = env[name];
     if (v === undefined) return legacy;
     if (v === "") return "test";
     if (v === "vertex" || v === "0g") return v;
     throw new Error(`${name}: vertex, 0g, or empty for TEST RENDERs`);
   };
-  return { image: pick("LIKENESS_AI_IMAGE"), video: pick("LIKENESS_AI_VIDEO"), explicit: { image: env.LIKENESS_AI_IMAGE !== undefined, video: env.LIKENESS_AI_VIDEO !== undefined } };
+  return { image: pick("FACEVISA_AI_IMAGE"), video: pick("FACEVISA_AI_VIDEO"), explicit: { image: env.FACEVISA_AI_IMAGE !== undefined, video: env.FACEVISA_AI_VIDEO !== undefined } };
 }
 
 /** How the two media are made, for the startup line and the web: e.g. "image 0g, video vertex". */
@@ -50,7 +50,7 @@ export function composeProvider(image: AiProvider, video: AiProvider, o: { video
         if (!(e instanceof ZeroGError) || !e.refused) throw e;
         const why = `0G refused this video: ${e.message}${e.vendorCode ? ` (${e.vendorCode})` : ""}`;
         if (!o.videoFallback) throw new Error(why);
-        onProgress?.(`${why}; making it on ${o.videoFallback.name} instead (LIKENESS_AI_VIDEO_FALLBACK)`);
+        onProgress?.(`${why}; making it on ${o.videoFallback.name} instead (FACEVISA_AI_VIDEO_FALLBACK)`);
         return o.videoFallback.generateVideo(from, prompt, onProgress);
       }
     },
@@ -63,7 +63,7 @@ export function providersFromEnv(root: string, env = process.env): { ai: AiProvi
   let zerog: ReturnType<typeof zeroGConfigFromEnv>;
   const make = (kind: "image" | "video"): AiProvider => {
     const choice = m[kind];
-    const name = kind === "image" ? "LIKENESS_AI_IMAGE" : "LIKENESS_AI_VIDEO";
+    const name = kind === "image" ? "FACEVISA_AI_IMAGE" : "FACEVISA_AI_VIDEO";
     if (choice === "vertex") {
       const s = vertexStatus();
       if (s.on) return vertexProvider();
@@ -79,9 +79,9 @@ export function providersFromEnv(root: string, env = process.env): { ai: AiProvi
   };
   const image = make("image");
   const video = m.image === m.video ? image : make("video");
-  const fallback = env.LIKENESS_AI_VIDEO_FALLBACK;
-  if (fallback && fallback !== "vertex") throw new Error("LIKENESS_AI_VIDEO_FALLBACK: vertex or empty");
-  if (fallback && !vertexStatus().on) throw new Error("LIKENESS_AI_VIDEO_FALLBACK=vertex needs Vertex AI (VERTEX_PROJECT)");
+  const fallback = env.FACEVISA_AI_VIDEO_FALLBACK;
+  if (fallback && fallback !== "vertex") throw new Error("FACEVISA_AI_VIDEO_FALLBACK: vertex or empty");
+  if (fallback && !vertexStatus().on) throw new Error("FACEVISA_AI_VIDEO_FALLBACK=vertex needs Vertex AI (VERTEX_PROJECT)");
   const resolved = { image: image.name === "test" ? "test" : m.image, video: video.name === "test" ? "test" : m.video } as const;
   return { ai: composeProvider(image, video, fallback && m.video === "0g" ? { videoFallback: vertexProvider() } : {}), ...resolved };
 }

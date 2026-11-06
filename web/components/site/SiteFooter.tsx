@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-export const SOURCE_URL = "https://github.com/rohitshukla11/likeness-hsk";
+export const SOURCE_URL = "https://github.com/rohitshukla11/eth_mumbai";
 
 /** Footer from the landing mockup, shared by every page. */
 export function SiteFooter() {
@@ -11,11 +11,11 @@ export function SiteFooter() {
           <h2 className="m-0 font-display text-[clamp(22px,3vw,30px)] font-extrabold leading-[1.3]">
             THE FUTURE OF YOUR
             <br />
-            LIKENESS IS YOURS
+            FACE IS YOURS
           </h2>
           <div className="flex flex-col gap-3 text-[15px] text-grey-dark">
             <span className="text-white">License your face to AI. Only you approve each ad.</span>
-            <span>World ID check before listing · test payments only, no money moves yet</span>
+            <span>World ID check before listing · paid in USDT on Whitechain testnet</span>
             <Link href="/how" className="text-grey-dark underline-offset-2 hover:text-white hover:underline">
               How consent works
             </Link>
@@ -41,7 +41,7 @@ export function SiteFooter() {
               Source<span className="sr-only"> (opens GitHub)</span>
             </a>
           </span>
-          <span>© 2026 Likeness</span>
+          <span>© 2026 FaceVisa</span>
         </div>
       </div>
     </footer>
