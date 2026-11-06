@@ -38,12 +38,14 @@ export function stillPrompt(brief: string, purpose: "image" | "video"): string {
     "The image shows one real, consenting adult who has licensed their face for this advertising image.",
     "Generate a new photorealistic image of exactly this person, keeping their face, identity and appearance faithful to the reference photo.",
     "Their face is clearly visible, unobstructed and well lit; one person only.",
-    purpose === "video" ? "Compose it as the opening frame of a short video ad: landscape 16:9, the person in the centre third with space around them." : "Square advertising photo, the person as the clear subject.",
+    purpose === "video"
+      ? "Compose it as the opening frame of a short video ad: landscape 16:9, the person in the centre third with room to move, already in the middle of the brief's action (for example mid-stride if they are running), not posing for the camera."
+      : "Square advertising photo, the person as the clear subject.",
     "Do not add any text, logos, captions or watermarks.",
     // The wardrobe rule (both providers): image models copy the reference photo's clothes and accessories.
     "Clothing: as the brief describes; if it names none, plain, simple clothing with no logos, text, prints or brand marks. Never copy the clothing from the reference photo.",
     "Accessories: none from the reference photo (no earbuds, headphones, hats, bags, badges or jewellery from it) unless the brief asks for them.",
-    "Pose and expression: natural and suited to the brief (for example relaxed and smiling in a café), not the reference photo's straight-on pose or neutral expression.",
+    "Pose and expression: doing what the brief describes, caught mid-movement when it has an action (for example mid-stride when running), otherwise natural and suited to the brief (for example relaxed and smiling in a café); never the reference photo's straight-on pose or neutral expression.",
     `Brief: ${brief}`,
   ].join("\n");
 }
@@ -60,9 +62,10 @@ export function fullPrompt(kind: AdKind, p: { prompt: string; motion?: string })
 
 export function motionPrompt(brief: string): string {
   return [
-    brief.trim(),
-    "Keep exactly the person, product and setting of the first frame; their face stays fully visible and recognisable throughout.",
-    "Subtle, natural motion: a slow camera push-in, small natural head and hand movement, a confident smile. No cuts.",
+    `Action: ${brief.trim()}`,
+    "The person performs the action in the brief continuously for the whole clip, with natural full-body movement (for example, if they are running, they keep running along the path at a steady pace); they never stop to stand or pose.",
+    "The camera moves with them (a smooth tracking or follow shot) so they stay in frame. One continuous shot, no cuts.",
+    "Keep exactly the person, product and setting of the first frame; their face stays visible and recognisable throughout.",
     "Photorealistic advertising footage. No text, captions, logos or watermarks.",
   ].join("\n");
 }

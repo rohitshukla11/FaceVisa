@@ -17,7 +17,7 @@ import { addr, key, u64 } from "@arkiv-network/sdk/schema";
 import { defineChain, formatEther, http, keccak256, parseEther, parseTransaction, TransactionReceiptNotFoundError, type Hex, type Transport } from "viem";
 import type { PrivateKeyAccount } from "viem/accounts";
 import { estimateGas, getGasPrice } from "viem/actions";
-import { arkivSchemas, type ArkivSchemas, type EntityKind, type Plain } from "./schema.js";
+import { arkivSchemas, U64_KEYS, type ArkivSchemas, type EntityKind, type Plain } from "./schema.js";
 
 export const RABDI_CHAIN_ID = 7794095;
 /** Development and tests: anything goes, labelled by identity. Dev-only short lifetimes are allowed only here. */
@@ -100,7 +100,7 @@ export interface ArkivClient {
   transfer(signer: PrivateKeyAccount, to: Hex, value: bigint, hooks: SendHooks): Promise<{ txHash: Hex }>;
 }
 
-const U64_COLS = new Set(["price", "max_days", "duration_days", "approved_at", "licence_expires_at", "revoked_at", "face_score"]);
+const U64_COLS = U64_KEYS;
 const ADDR_COLS = new Set(["brand", "creator", "payer"]);
 const KEY_COLS = new Set(["request_key", "licence_key"]);
 

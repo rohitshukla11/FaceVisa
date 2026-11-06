@@ -169,6 +169,9 @@ export interface AiCaps {
 }
 
 /** A committed change to a public record (what Arkiv mirrors). */
+export interface CreatorStatsRow { adsApproved: number; activeLicences: number; revoked: number; earnedUsdt: number; brands: number; firstListed: number | null; lastActive: number }
+export interface BrandStatsRow { adsLicensed: number; activeLicences: number; spentUsdt: number; creators: number; lastActive: number }
+
 export type DataChange = { kind: "listing"; uid: string } | { kind: "request"; id: string } | { kind: "licence"; id: string } | { kind: "receipt"; hash: string };
 
 /** What the brand agent, the pipeline and the Agent Pass checkpoints need. SQLite is the authority; Arkiv mirrors it. */
@@ -223,6 +226,12 @@ export interface FaceVisaData {
   payments(by: { brand?: string; actionId?: string }): Payment[];
   /** Not voided on a rail today (UTC), micro-USD: the rail's own daily cap (Whitechain's settlement cap). */
   railTotalToday(rail: string): number;
+  /** A creator's running numbers (for their stats entity on Arkiv), or undefined if they've never listed or licensed. */
+  creatorStats(uid: string, now?: number, since?: number): CreatorStatsRow | undefined;
+  /** A brand's running numbers, or undefined if it never licensed an ad. */
+  brandStats(uid: string, now?: number, since?: number): BrandStatsRow | undefined;
+  /** Who has stats: listed creators and anyone (creator or brand) with a licence still in its term. */
+  statsSubjects(now?: number, since?: number): { creators: string[]; brands: string[] };
   /** Payments on a rail still authorized (not settled or voided): an outcome to find out, e.g. after a restart. */
   unsettled(rail: string): Payment[];
   /** Authorized or settled today (UTC) by this brand, micro-USD. */
@@ -591,6 +600,33 @@ export class SqliteFaceVisaData implements FaceVisaData {
 
   unsettled(rail: string) {
     return (this.db.prepare("select * from payments where rail = ? and status = 'authorized' order by created_at").all(rail) as Row[]).map(paymentRow);
+  }
+
+  /** Counted from `since` (ms): licences made, and payments for them, since the database's current namespace began. */
+  creatorStats(uid: string, now = Date.now(), since = 0): CreatorStatsRow | undefined {
+    const listing = this.db.prepare("select listed_at from listings where uid = ? and listed = 1").get(uid) as Row | undefined;
+    const l = this.db.prepare("select count(*) as n, coalesce(sum(status = 'active' and expires_at > ?), 0) as active, coalesce(sum(status = 'revoked'), 0) as revoked, count(distinct brand) as brands, coalesce(max(max(created_at, coalesce(revoked_at, 0))), 0) as last from licence_records where creator = ? and created_at >= ?").get(now, uid, since) as Row;
+    if (!listing && !Number(l.n)) return undefined;
+    // Earned: settled USDT on Whitechain for this creator's licences (USDT's smallest units = micro-USD).
+    const earned = this.db.prepare("select coalesce(sum(p.amount), 0) as n from payments p join licence_records l on l.action_id = p.action_id where l.creator = ? and l.created_at >= ? and p.status = 'settled' and p.rail = 'whitechain'").get(uid, since) as Row;
+    const listedAt = listing ? Number(listing.listed_at) : null;
+    return { adsApproved: Number(l.n), activeLicences: Number(l.active), revoked: Number(l.revoked), earnedUsdt: Number(earned.n), brands: Number(l.brands), firstListed: listedAt, lastActive: Math.max(Number(l.last), listedAt ?? 0) };
+  }
+
+  brandStats(uid: string, now = Date.now(), since = 0): BrandStatsRow | undefined {
+    const l = this.db.prepare("select count(*) as n, coalesce(sum(status = 'active' and expires_at > ?), 0) as active, count(distinct creator) as creators, coalesce(max(max(created_at, coalesce(revoked_at, 0))), 0) as last from licence_records where brand = ? and created_at >= ?").get(now, uid, since) as Row;
+    if (!Number(l.n)) return undefined;
+    const spent = this.db.prepare("select coalesce(sum(p.amount), 0) as n from payments p join licence_records l on l.action_id = p.action_id where p.brand = ? and l.created_at >= ? and p.status = 'settled' and p.rail = 'whitechain'").get(uid, since) as Row;
+    return { adsLicensed: Number(l.n), activeLicences: Number(l.active), spentUsdt: Number(spent.n), creators: Number(l.creators), lastActive: Number(l.last) };
+  }
+
+  statsSubjects(now = Date.now(), since = 0) {
+    const ids = (sql: string, ...args: number[]) => (this.db.prepare(sql).all(...args) as Row[]).map((r) => String(r.id));
+    // Listed creators, and anyone with a licence still in its term (an unlisted creator's stats then simply expire).
+    return {
+      creators: ids("select uid as id from listings where listed = 1 union select creator as id from licence_records where expires_at > ? and created_at >= ?", now, since),
+      brands: ids("select distinct brand as id from licence_records where expires_at > ? and created_at >= ?", now, since),
+    };
   }
 
   railTotalToday(rail: string) {

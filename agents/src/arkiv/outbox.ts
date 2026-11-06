@@ -13,6 +13,10 @@
  * reverted receipt, end in failed. Failures never block the product flow; the UI and the logs show them.
  *
  * Account keys get a capped top-up from the funder before their first write ("fund" items, same rules).
+ *
+ * Each creator's and brand's running stats are records too (creator_stats, brand_stats): queued with every change
+ * to their listings, licences and payments, and re-planned by the hourly sweep (licences end by the clock), so they
+ * are patched only when a number changed and their lifetime is renewed while they're in use.
  */
 import { randomBytes } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
@@ -23,7 +27,7 @@ import type { Keystore } from "../app/keystore.js";
 import type { DataChange, FaceVisaData, PendingAction } from "../facevisa/data.js";
 import { MAX_DAYS_LIMIT } from "../facevisa/rules.js";
 import { scrub, type ArkivClient, type ArkivConfig, type Ops } from "./chain.js";
-import { arkivSchemas, changed, licenceValues, listingValues, receiptValues, requestValues, revocationValues, typed, type ArkivSchemas, type EntityKind, type Identity, type Plain, type RequestStatus } from "./schema.js";
+import { arkivSchemas, brandStatsValues, changed, creatorStatsValues, licenceValues, listingValues, receiptValues, requestValues, revocationValues, typed, type ArkivSchemas, type EntityKind, type Identity, type Plain, type RequestStatus } from "./schema.js";
 
 type ItemKind = EntityKind | "fund";
 type ItemStatus = "pending" | "sending" | "uncertain" | "done" | "failed";
@@ -47,7 +51,7 @@ interface Item {
 
 /** What a send was meant to do, stored before signing: how to record it once it's confirmed. */
 type Intent =
-  | { op: "create" | "update"; owner: Hex; ref: string; values: Plain; expiresAt: number; entityKey?: Hex }
+  | { op: "create" | "update" | "delete"; owner: Hex; ref: string; values: Plain; expiresAt: number; entityKey?: Hex }
   | { op: "transfer"; to: Hex; value: string };
 
 export interface Entity {
@@ -81,6 +85,10 @@ type Plan =
 const DAY = 86_400_000;
 /** A listing lives 30 days and is extended while its creator stays listed, once it has less than half of that left. */
 const LISTING_MS = 30 * DAY;
+/** A creator's or brand's stats entity lives 30 days, renewed while it's in use. */
+const STATS_MS = 30 * DAY;
+/** How long a receipt waits for its file's Swarm upload before it's written without a reference. */
+const SWARM_WAIT_MS = 15 * 60_000;
 /** An entity can't outlive this (7,884,000 blocks of 2 s), so a licence's expiry is clamped to it. */
 const MAX_LIFETIME_MS = 7_884_000 * 2_000;
 const MAX_ATTEMPTS = 8;
@@ -164,6 +172,10 @@ export interface ArkivSyncOptions {
   presenceOf?: (uid: string) => string;
   /** The credential behind it ("selfie", "proof_of_human"), or null. */
   credentialOf?: (uid: string) => string | null;
+  /** The ad's Swarm upload, when Swarm is on: the receipt waits for it (up to SWARM_WAIT_MS) and carries its reference. */
+  swarmOf?: (hash: string) => { state: "pending" } | { state: "uploaded"; ref: string; encrypted: boolean } | { state: "failed"; error: string } | undefined;
+  /** Creator and brand stats entities (default on); tests of the other entities turn them off to count writes. */
+  stats?: boolean;
   /** How long a listing entity lives (default 30 days); it's renewed once under half is left. Minutes in dev only. */
   listingLifetimeMs?: number;
   /** Start the worker (default true; tests step it with `drain`). */
@@ -197,14 +209,26 @@ export class ArkivSync {
 
   /** A committed change: queue its record (and, for a release, nothing else is needed: each record queues itself). */
   changed(c: DataChange) {
-    if (c.kind === "listing") this.enqueue("listing", c.uid);
-    else if (c.kind === "request") this.enqueue("request", c.id);
+    if (c.kind === "listing") {
+      this.enqueue("listing", c.uid);
+      if (this.stats) this.enqueue("creator_stats", c.uid);
+    } else if (c.kind === "request") this.enqueue("request", c.id);
     else if (c.kind === "licence") {
       this.enqueue("licence", c.id);
+      const l = this.o.data.licence(c.id);
       // A revocation also gets its own record, owned by the creator, which outlives the licence entity.
-      if (this.o.data.licence(c.id)?.status === "revoked") this.enqueue("revocation", c.id);
+      if (l?.status === "revoked") this.enqueue("revocation", c.id);
+      if (l && this.stats) (this.enqueue("creator_stats", l.creator), this.enqueue("brand_stats", l.brand));
+    } else {
+      this.enqueue("receipt", c.hash);
+      // A receipt means a settled payment: both sides' totals move.
+      const l = this.o.data.receipt(c.hash) && this.o.data.licence(this.o.data.receipt(c.hash)!.licenceId);
+      if (l && this.stats) (this.enqueue("creator_stats", l.creator), this.enqueue("brand_stats", l.brand));
     }
-    else this.enqueue("receipt", c.hash);
+  }
+
+  private get stats() {
+    return this.o.stats ?? true;
   }
 
   /** At most one waiting item per record: a later change just makes it due now. */
@@ -244,6 +268,12 @@ export class ArkivSync {
     for (const id of missing("revocation", q("select l.id from licence_records l join arkiv_entities e on e.kind = 'licence' and e.subject = l.id where l.status = 'revoked'"))) (this.enqueue("revocation", id), n++);
     const renew = (this.o.db.prepare("select e.subject from arkiv_entities e join listings l on l.uid = e.subject where e.kind = 'listing' and l.listed = 1 and e.expires_at < ?").all(this.now() + this.listingMs / 2) as Row[]).map((r) => String(r.subject));
     for (const uid of renew) (this.enqueue("listing", uid), n++);
+    // Stats: every subject is re-planned (active licences fall as licences end); only a changed number is written.
+    const { creators, brands } = this.stats ? this.o.data.statsSubjects(this.now(), this.since) : { creators: [], brands: [] };
+    // Plus every stats entity still alive: its numbers decay as licences end, and it's deleted once nothing is left.
+    const alive = (kind: string) => (this.o.db.prepare("select subject from arkiv_entities where kind = ? and expires_at > ?").all(kind, this.now()) as Row[]).map((r) => String(r.subject));
+    for (const uid of new Set([...creators, ...(this.stats ? alive("creator_stats") : [])])) if (!this.isOpen("creator_stats", uid)) (this.enqueue("creator_stats", uid), n++);
+    for (const uid of new Set([...brands, ...(this.stats ? alive("brand_stats") : [])])) if (!this.isOpen("brand_stats", uid)) (this.enqueue("brand_stats", uid), n++);
     return n;
   }
 
@@ -412,6 +442,12 @@ export class ArkivSync {
       const entityKey = intent.entityKey ?? prev?.entityKey;
       if (!entityKey) throw new Error("no entity key after a confirmed write");
       const tx = txHash === "0x" ? (prev?.txHash ?? "0x") : txHash;
+      if (intent.op === "delete") {
+        this.o.db.prepare("delete from arkiv_entities where kind = ? and subject = ?").run(item.kind, item.subject);
+        this.log(`${item.kind} ${item.subject}: deleted ${entityKey}${txHash !== "0x" ? ` in ${txHash}` : ""}`);
+        this.update(item.seq, { status: "done", last_error: null, ...(txHash !== "0x" ? { tx_hash: txHash } : {}) });
+        return;
+      }
       this.o.db
         .prepare(
           `insert into arkiv_entities (kind, subject, entity_key, owner, ref, vals, expires_at, tx_hash, updated_at) values (?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -475,7 +511,55 @@ export class ArkivSync {
         return this.planReceipt(item);
       case "revocation":
         return this.planRevocation(item);
+      case "creator_stats":
+        return this.planCreatorStats(item);
+      case "brand_stats":
+        return this.planBrandStats(item);
     }
+  }
+
+  /** A creator's stats entity, owned by their key: created on their first listing or licence, patched as numbers move. */
+  private planCreatorStats(item: Item): Plan {
+    const uid = item.subject;
+    const account = this.o.accounts.account(uid);
+    const st = account && this.o.data.creatorStats(uid, this.now(), this.since);
+    if (!account || !st) return this.dropStats("creator_stats", item, uid);
+    if (this.testIdentity(account.iss)) return { do: "skip", note: "a test identity: never written to the demo namespace" };
+    const owner = this.address(uid);
+    return this.upsert("creator_stats", item, `account:${uid}`, owner, (ref) => creatorStatsValues(this.o.config.prefix, ref, owner, st), this.statsExpiry("creator_stats", uid));
+  }
+
+  /** A brand's stats entity, owned by its account key. */
+  private planBrandStats(item: Item): Plan {
+    const uid = item.subject;
+    const account = this.o.accounts.account(uid);
+    const st = account && this.o.data.brandStats(uid, this.now(), this.since);
+    if (!account || !st) return this.dropStats("brand_stats", item, uid);
+    if (this.testIdentity(account.iss)) return { do: "skip", note: "a test identity: never written to the demo namespace" };
+    const owner = this.address(uid);
+    return this.upsert("brand_stats", item, `account:${uid}`, owner, (ref) => brandStatsValues(this.o.config.prefix, ref, owner, st), this.statsExpiry("brand_stats", uid));
+  }
+
+  /** No stats any more (unlisted, no licence in this namespace): its entity, if any, is deleted by its owner. */
+  private dropStats(kind: "creator_stats" | "brand_stats", item: Item, uid: string): Plan {
+    const e = this.entity(kind, uid);
+    if (!e || e.expiresAt <= this.now()) return { do: "skip", note: "no stats" };
+    return { do: "send", signer: `account:${uid}`, ops: { deletes: [{ entityKey: e.entityKey }] }, intent: { op: "delete", owner: e.owner, ref: e.ref, values: e.values, expiresAt: e.expiresAt, entityKey: e.entityKey } };
+  }
+
+  /**
+   * Stats count what happened in this namespace: licences and payments since the database was bound to it (the
+   * meta key arkiv_namespace_since, ms; 0 when it was bound before the key existed).
+   */
+  private get since() {
+    const r = this.o.db.prepare("select value from meta where key = 'arkiv_namespace_since'").get() as { value: string } | undefined;
+    return r ? Number(r.value) : 0;
+  }
+
+  /** Stats live 30 days, extended once less than half of that is left (by the next change or the hourly sweep). */
+  private statsExpiry(kind: "creator_stats" | "brand_stats", uid: string) {
+    const e = this.entity(kind, uid);
+    return { create: this.now() + STATS_MS, extendTo: e && e.expiresAt - this.now() < STATS_MS / 2 ? this.now() + STATS_MS : undefined };
   }
 
   private address(uid: string) {
@@ -536,6 +620,10 @@ export class ArkivSync {
     const values = (ref: string) =>
       requestValues(this.o.config.prefix, ref, { brand: this.address(a.brand), creator: this.address(a.creator), kind: a.kind, briefHash: a.briefHash, price: a.price, status, outputHash: a.output?.hash ?? null });
     return this.upsert("request", item, `account:${a.brand}`, this.address(a.brand), values, { create: a.expiresAt, extendTo: a.expiresAt });
+  }
+
+  private isOpen(kind: EntityKind, subject: string) {
+    return !!this.o.db.prepare("select 1 from arkiv_outbox where kind = ? and subject = ? and status in ('pending', 'sending', 'uncertain')").get(kind, subject);
   }
 
   private open(kind: EntityKind, subject: string) {
@@ -607,6 +695,10 @@ export class ArkivSync {
     const licence = this.o.data.licence(r.licenceId);
     const payment = licence ? this.o.data.payments({ actionId: licence.actionId }).find((p) => p.id === r.paymentId) : undefined;
     const rail = payment?.rail ?? null;
+    const creatorUid = licence?.creator;
+    // Swarm: the receipt is read-only, so it waits (a while) for the file's reference rather than going without.
+    const sw = this.o.swarmOf?.(item.subject);
+    if (sw?.state === "pending" && this.now() - r.releasedAt < SWARM_WAIT_MS && !this.entity("receipt", item.subject)) return { do: "wait", note: "waiting for the file's Swarm upload", ms: 10_000 };
     const values = (ref: string) =>
       receiptValues(this.o.config.prefix, ref, {
         fileHash: item.subject,
@@ -620,6 +712,12 @@ export class ArkivSync {
         paymentRef: r.paymentRef,
         paymentRail: rail,
         payer: payment?.payer ?? null,
+        // What made it, and the creator's World ID check at release (production | sandbox | none).
+        generator: r.provider,
+        swarmRef: sw?.state === "uploaded" ? sw.ref : null,
+        swarmEncrypted: sw?.state === "uploaded" ? sw.encrypted : null,
+        worldId: creatorUid && this.o.presenceOf ? this.o.presenceOf(creatorUid) : null,
+        worldIdCredential: creatorUid && this.o.credentialOf ? this.o.credentialOf(creatorUid) : null,
         faceCheck: r.faceCheck,
         faceScore: r.faceScore,
       });
