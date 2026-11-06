@@ -1,0 +1,22 @@
+[Unit]
+Description=Likeness web (Next.js standalone, 127.0.0.1:3000; /api goes to the backend)
+After=network-online.target likeness-backend.service
+Wants=network-online.target
+
+[Service]
+User=likeness
+Group=likeness
+WorkingDirectory=/opt/likeness/current/web/.next/standalone
+Environment=NODE_ENV=production
+Environment=PORT=3000
+Environment=HOSTNAME=127.0.0.1
+ExecStart=/usr/bin/node server.js
+Restart=always
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target

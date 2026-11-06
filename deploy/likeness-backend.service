@@ -1,0 +1,27 @@
+[Unit]
+Description=FaceVisa backend (agents, 127.0.0.1:8788)
+After=network-online.target srv-facevisa.mount
+Wants=network-online.target
+RequiresMountsFor=/srv/likeness
+
+[Service]
+User=likeness
+Group=likeness
+WorkingDirectory=/opt/likeness/current/agents
+Environment=NODE_ENV=production
+Environment=FACEVISA_MODE=testnet
+# SESSION_SECRET, made on the server once (deploy/remote.sh secrets); the rest is in /srv/likeness/env.
+EnvironmentFile=/srv/likeness/secrets/session.env
+ExecStart=/opt/likeness/current/agents/node_modules/.bin/tsx --env-file=../.env.local src/app/server.ts
+Restart=always
+RestartSec=3
+# Hardening: the app writes only its data disk.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/srv/likeness
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

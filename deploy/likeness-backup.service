@@ -1,0 +1,7 @@
+[Unit]
+Description=Likeness: a consistent copy of the SQLite database (7 kept)
+
+[Service]
+Type=oneshot
+User=likeness
+ExecStart=/bin/sh -c 'sqlite3 /srv/likeness/accounts/testnet/accounts.sqlite ".backup /srv/likeness/backups/accounts-$(date -u +%%Y%%m%%d-%%H%%M).sqlite" && find /srv/likeness/backups -name "accounts-*.sqlite" -mtime +7 -delete'

@@ -39,3 +39,9 @@ docs/submission/
 
 # Side-by-side outputs for Rohit to watch (his face): never committed
 local-compare/
+
+# Foundry build output and dependencies
+contracts/out/
+contracts/cache/
+contracts/broadcast/
+contracts/lib/
