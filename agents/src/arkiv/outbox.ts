@@ -551,7 +551,7 @@ export class ArkivSync {
    * Stats count what happened in this namespace: licences and payments since the database was bound to it (the
    * meta key arkiv_namespace_since, ms; 0 when it was bound before the key existed).
    */
-  private get since() {
+  get since() {
     const r = this.o.db.prepare("select value from meta where key = 'arkiv_namespace_since'").get() as { value: string } | undefined;
     return r ? Number(r.value) : 0;
   }

@@ -9,6 +9,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { btnClass, ErrorCard, Page, StatusPill } from "@/components/ds";
 import { CreatorFace } from "@/components/facevisa/CreatorFace";
+import { CreatorStatsRow } from "@/components/facevisa/CreatorStatsRow";
 import { PresenceBadge } from "@/components/facevisa/PresenceBadge";
 import { useAuth } from "@/components/site/Auth";
 import { SignIn } from "@/components/site/SignIn";
@@ -97,6 +98,7 @@ export default function CreatorsPage() {
                     <Fact label="Video" value={c.video} />
                     <Fact label="Up to" value={`${c.maxDays} days`} />
                   </dl>
+                  <CreatorStatsRow stats={c.stats} arkiv={c.statsArkiv} usagePage={c.usagePage} />
                   <span className="text-[13px] text-grey">{c.refuses.length ? `Refuses: ${c.refuses.join(", ")}` : "Refuses nothing beyond the platform's rules"}</span>
                   <span className="text-[12px] text-grey">Listed {new Date(c.listedAt).toLocaleDateString(undefined, { dateStyle: "medium" })}</span>
                   {data?.signedIn && !c.self && !c.seeded && (

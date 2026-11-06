@@ -17,7 +17,7 @@ import { scrub } from "../arkiv/chain.js";
 import type { Account } from "./accounts.js";
 import { localDevAllowed } from "./devmode.js";
 import { clientIp, guardFromEnv, type Guard } from "./guard.js";
-import { consentMethod, facevisaRoutes, presenceView, sendJson } from "./facevisaRoutes.js";
+import { arkivStatus, consentMethod, facevisaRoutes, presenceView, sendJson } from "./facevisaRoutes.js";
 import { health, preflight } from "./health.js";
 import { OnboardingError } from "./onboarding.js";
 import { faceModelsPresent, verifyCapture } from "../facevisa/face.js";
@@ -96,6 +96,8 @@ function meView(rt: Runtime, me: Account) {
           // The address that owns their entities on Arkiv (their listing, licences, revocations), with Arkiv on: the
           // public "where is my face used" page looks it up. Only an address; the key stays in the keystore.
           arkivAddress: rt.arkiv ? (rt.keystore?.address(`account:${me.uid}`) ?? null) : null,
+          // Their creator_stats entity on Arkiv (ads approved, active licences, earned, brands, revoked).
+          arkivStats: rt.arkiv ? arkivStatus(rt, "creator_stats", me.uid) : null,
           // Their Hedera account (where brands pay them), with x402 on: an account ID only, and its HashScan page.
           hedera: ((id) => (id ? { account: id, url: `https://hashscan.io/testnet/account/${id}` } : null))(rt.x402 ? rt.accounts.hederaAccount(me.uid) : null),
           // Where brands pay them: their Whitechain address (their custodial key) on the explorer, or their Hedera account.

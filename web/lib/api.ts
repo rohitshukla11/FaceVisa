@@ -32,6 +32,8 @@ export type Me = {
     arkivListing?: { expiresAt: number; renewsFrom: number } | null;
     /** The address that owns their entities on Arkiv, when Arkiv is on: for the public "where is my face used" page. */
     arkivAddress?: string | null;
+    /** Their creator_stats entity on Arkiv (ads approved, active licences, earned, brands, revoked). */
+    arkivStats?: { state: string; url?: string; entityKey?: string } | null;
     /** Their Hedera account (where brands pay them) and its HashScan page, with x402 payments on. */
     hedera?: { account: string; url: string } | null;
     /** Where brands pay them: their Whitechain address (or Hedera account) and its explorer page. */

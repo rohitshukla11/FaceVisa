@@ -1,5 +1,5 @@
 /**
- * Face checks on a generated image (the gate on every output; copied from likeness-meta, lib/server/facecheck.ts
+ * Face checks on a generated image (the gate on every output; copied from Rohit's earlier face project, lib/server/facecheck.ts
  * @93993bc, see CHANGES.md):
  *   YuNet: which faces are in the image, and is the best one fully inside the frame (box, headroom and
  *   all five landmarks)? → AuraFace: how closely does it match the creator's reference frames (best
@@ -10,7 +10,7 @@ import { analyseFaces, cosine, type Face } from "./match.js";
 
 /**
  * Generated images match their source less closely than live photos do, so this check has its own
- * threshold. Calibrated 2026-10-17 in likeness-ai (small sample): a Gemini still of a demo creator
+ * threshold. Calibrated 2026-10-17 in facevisa-ai (small sample): a Gemini still of a demo creator
  * scored 0.57 against the creator's references and video frames made from it 0.43–0.55; a real
  * person against invented faces scored at most 0.24 (facematch.ts). 0.35 sits between the two.
  * Recalibrate for this app's providers (Vertex, 0G) on real data before relying on it.

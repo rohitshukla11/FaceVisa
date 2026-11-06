@@ -3,7 +3,7 @@
 /**
  * The signed-in account, shared by every page. Sign-in runs entirely in our backend (/api/auth/login → the provider →
  * /api/auth/callback): the browser only follows redirects and carries our HttpOnly session cookie, so no token or
- * secret ever reaches this code. /api/me says who is signed in. The ways in, as the backend says (/api/likeness):
+ * secret ever reaches this code. /api/me says who is signed in. The ways in, as the backend says (/api/facevisa):
  * Sign in with Google (GOOGLE_SIGNIN=1; on the public demo it replaces the demo identities), the local dev sign-in
  * (local development only), and World ID sign-in only when the backend has WORLDID_SIGNIN=1 (off by default: World ID
  * appears only as the IDKit check before a creator lists).
@@ -45,7 +45,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [demo, setDemo] = useState<DemoMode | undefined>(undefined);
   const [ways, setWays] = useState<Ways>({ worldId: false, dev: false, google: false, demo: false });
   useEffect(() => {
-    void api<{ publicDemo?: { retentionHours: number } | null; worldIdSignIn?: boolean; devSignIn?: boolean; googleSignIn?: boolean; demoSignIn?: boolean }>("/api/likeness").then(
+    void api<{ publicDemo?: { retentionHours: number } | null; worldIdSignIn?: boolean; devSignIn?: boolean; googleSignIn?: boolean; demoSignIn?: boolean }>("/api/facevisa").then(
       (m) => {
         setDemo(m.publicDemo ? { retentionHours: m.publicDemo.retentionHours } : null);
         setWays({ worldId: !!m.worldIdSignIn, dev: !!m.devSignIn, google: !!m.googleSignIn, demo: !!m.demoSignIn });

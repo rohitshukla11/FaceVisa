@@ -1,6 +1,6 @@
 /**
  * Local face detection and 1:1 matching: are the live capture's frames one person, and is the creator's face in a
- * generated ad? Runs on this server, in memory. Copied from likeness-meta (lib/server/facematch.ts @93993bc); see
+ * generated ad? Runs on this server, in memory. Copied from Rohit's earlier face project (lib/server/facematch.ts @93993bc); see
  * CHANGES.md.
  *
  *   detect (YuNet, OpenCV Zoo, MIT weights) → 5 landmarks → similarity transform to the standard

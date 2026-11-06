@@ -13,6 +13,7 @@ import { Field, inputClass } from "@/components/ui";
 import type { Me } from "@/lib/api";
 import { getJson, postJson, STATUS, when, type AgentEvent, type BrandRequest, type DataSource, type Kind, type LicenceView, type Meta, type ShortlistEntry } from "@/lib/facevisa";
 import { ItemSource, SourceLabel } from "./SourceLabel";
+import { CreatorStatsRow } from "./CreatorStatsRow";
 import { MediaTile } from "./ReceiptTile";
 import { PaymentLine } from "./PaymentLine";
 import { SlowStep } from "./SlowStep";
@@ -266,6 +267,7 @@ export function BrandAgentConsole({ me }: { me: Me }) {
                         {e.youtube && <StatusPill kind="licensed" title={`"${e.youtube.title}": the channel belongs to the Google account that granted access`}>Verified YouTube channel</StatusPill>}
                         {e.youtube?.faceMatch && <StatusPill kind="licensed" title="2+ of the channel's images match the creator's live capture">Face matches channel</StatusPill>}
                       </div>
+                      <CreatorStatsRow stats={e.stats} arkiv={e.statsArkiv} usagePage={e.usagePage} />
                       <span className={`text-[13px] ${e.pick ? "text-ok" : MUTED}`}>{e.reason}</span>
                       {e.seeded && <span className="text-[12px] text-wait">{SEEDED}</span>}
                       <ItemSource source={e.source} url={e.url} why={e.why} />

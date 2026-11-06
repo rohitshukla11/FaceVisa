@@ -186,6 +186,22 @@ export function CreatorHome({ me, onChange }: { me: Me; onChange: () => Promise<
           <Stat label="Revoked" value={revoked} />
           <Stat label="Brands" value={brands} note="licensed your face" />
         </section>
+        {c?.arkivStats?.state === "synced" && c.arkivStats.url && (
+          <p className={`-mt-1 m-0 text-[12px] ${MUTED}`}>
+            Your numbers are public on Arkiv:{" "}
+            <a href={c.arkivStats.url} target="_blank" rel="noreferrer" className="underline">
+              your stats entity ↗
+            </a>
+            {facePage && (
+              <>
+                {" · "}
+                <a href={facePage} target="_blank" rel="noreferrer" className="underline">
+                  where your face is used ↗
+                </a>
+              </>
+            )}
+          </p>
+        )}
 
         {/* ------------------------------------------------ waiting */}
         <section className="flex flex-col gap-3 rounded-[22px] bg-lime p-5 text-ink sm:p-6" aria-label="Ads waiting for you">

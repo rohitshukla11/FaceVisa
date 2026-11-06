@@ -12,10 +12,10 @@ const DESCRIPTION = `${TAGLINE} A brand's AI agent finds creators within their r
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"),
-  title: { default: `Likeness: ${TAGLINE}`, template: "%s · Likeness" },
+  title: { default: `FaceVisa: ${TAGLINE}`, template: "%s · FaceVisa" },
   description: DESCRIPTION,
-  openGraph: { type: "website", siteName: "Likeness", title: `Likeness: ${TAGLINE}`, description: DESCRIPTION },
-  twitter: { card: "summary", title: `Likeness: ${TAGLINE}`, description: DESCRIPTION },
+  openGraph: { type: "website", siteName: "FaceVisa", title: `FaceVisa: ${TAGLINE}`, description: DESCRIPTION },
+  twitter: { card: "summary", title: `FaceVisa: ${TAGLINE}`, description: DESCRIPTION },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

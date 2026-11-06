@@ -1,5 +1,5 @@
 /**
- * Small app primitives, in the Likeness design system (app/globals.css, components/ds). Older pages
+ * Small app primitives, in the FaceVisa design system (app/globals.css, components/ds). Older pages
  * and panels use these; they render as white cards and pills on the off-white panel.
  */
 import Link from "next/link";

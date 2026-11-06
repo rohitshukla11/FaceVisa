@@ -1,7 +1,7 @@
 /**
  * The local face matcher's weights (face/match.ts): where they live, and, when FACE_MODELS_FETCH=1, fetching them on
  * first use, checked against the same sha256 pins as scripts/face-models.sh before anything loads them.
- * Copied from likeness-meta (lib/server/facemodels.ts @93993bc); see CHANGES.md.
+ * Copied from Rohit's earlier face project (lib/server/facemodels.ts @93993bc); see CHANGES.md.
  */
 import { createHash } from "node:crypto";
 import { createWriteStream, existsSync } from "node:fs";

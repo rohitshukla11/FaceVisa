@@ -58,6 +58,20 @@ const mediaName = (rt: Runtime, kind: "image" | "video") => {
 const ARKIV_OFF: Source = { from: "facevisa", why: "Arkiv is off on this server" };
 /** A record's mirror on Arkiv, for the UI: synced (with the entity), pending, failed, or off. */
 export const arkivStatus = (rt: Runtime, kind: EntityKind, subject: string): SyncStatus => rt.arkiv?.status(kind, subject) ?? { state: "off" };
+/**
+ * A creator's numbers as their creator_stats entity on Arkiv carries them (the same count: since this namespace began),
+ * the entity's sync state and link, and their public "where is my face used" page (the direct verifier, by address).
+ */
+export function creatorStatsView(rt: Runtime, uid: string) {
+  const s = rt.core.data.creatorStats(uid, Date.now(), rt.arkiv?.since ?? 0);
+  const address = rt.keystore?.address(`account:${uid}`) ?? null;
+  return {
+    stats: s ? { adsApproved: s.adsApproved, activeLicences: s.activeLicences, revoked: s.revoked, earned: usd(s.earnedUsdt), brands: s.brands } : null,
+    statsArkiv: arkivStatus(rt, "creator_stats", uid),
+    usagePage: address && rt.arkiv ? `/verifier/creator.html?creator=${address.toLowerCase()}&ns=${encodeURIComponent(rt.arkiv.prefix)}` : null,
+  };
+}
+
 /** A listed creator's face URL (signed-in accounts only), or null without a capture. */
 const faceUrl = (rt: Runtime, uid: string) => (rt.accounts.creator(uid)?.photoFile ? `/api/facevisa/creators/${uid}/face` : null);
 /**
@@ -259,6 +273,9 @@ export async function facevisaRoutes(c: Ctx): Promise<boolean> {
           ...(rt.presence ? { presence: p?.verified ? (p.environment ?? rt.presence.config.environment) : null, credential: p?.verified ? p.credential : null } : {}),
           ...(rt.demoState?.seeded(l.uid) ? { seeded: true } : {}),
           arkiv: arkivStatus(rt, "listing", l.uid),
+          // Their running numbers, as their creator_stats entity on Arkiv holds them (counted since this namespace
+          // began), with that entity and their public "where is my face used" page.
+          ...(rt.arkiv ? creatorStatsView(rt, l.uid) : {}),
           face: me ? faceUrl(rt, l.uid) : null,
         };
       }),
@@ -508,7 +525,7 @@ export async function facevisaRoutes(c: Ctx): Promise<boolean> {
       // Listings from Arkiv (the creators' own entities), falling back to the backend where they aren't confirmed there.
       const sourced = rt.arkivReads && !platformProblems(b.brief).length ? await rt.arkivReads!.shortlistListings(b) : undefined;
       const out = core.agent.shortlist(me.uid, b, sourced?.listings);
-      return send(out.problems.length ? 422 : 200, { ...(out.problems.length ? { error: out.problems.join("; ") } : {}), problems: out.problems, budget: usd(out.budget), entries: out.entries.map((e) => ({ ...e, price: usd(e.price), face: faceUrl(rt, e.creator), ...(rt.demoState?.seeded(e.creator) ? { seeded: true } : {}) })), source: sourced?.source ?? ARKIV_OFF, ...(sourced ? { query: sourced.queries.fits } : {}) });
+      return send(out.problems.length ? 422 : 200, { ...(out.problems.length ? { error: out.problems.join("; ") } : {}), problems: out.problems, budget: usd(out.budget), entries: out.entries.map((e) => ({ ...e, price: usd(e.price), face: faceUrl(rt, e.creator), ...(rt.arkiv ? creatorStatsView(rt, e.creator) : {}), ...(rt.demoState?.seeded(e.creator) ? { seeded: true } : {}) })), source: sourced?.source ?? ARKIV_OFF, ...(sourced ? { query: sourced.queries.fits } : {}) });
     }
     if (post && path === "/api/facevisa/agent/request") {
       if (brandUnverified(rt, me.uid)) return send(403, BRAND_CHECK);

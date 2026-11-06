@@ -244,6 +244,18 @@ export interface ShortlistEntry {
   credential?: string;
   /** The creator's face (their capture's first frame), for signed-in accounts; null without one. */
   face?: string | null;
+  stats?: CreatorStats | null;
+  statsArkiv?: ArkivSync;
+  usagePage?: string | null;
+}
+
+/** A creator's numbers, as their creator_stats entity on Arkiv holds them. */
+export interface CreatorStats {
+  adsApproved: number;
+  activeLicences: number;
+  revoked: number;
+  earned: string;
+  brands: number;
 }
 
 /** A listed creator, for the Creators page. */
@@ -262,6 +274,10 @@ export interface CreatorCard {
   arkiv: ArkivSync;
   /** Signed-in accounts only. */
   face: string | null;
+  /** Their numbers as their creator_stats entity on Arkiv holds them, that entity, and their public usage page. */
+  stats?: CreatorStats | null;
+  statsArkiv?: ArkivSync;
+  usagePage?: string | null;
 }
 
 export interface FaceVisaVerify {
