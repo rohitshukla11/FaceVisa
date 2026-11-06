@@ -34,10 +34,10 @@
     whitechainRpc: "https://rpc.testnet.whitechain.io",
     whitechainExplorer: "https://explorer.testnet.whitechain.io",
     settlement: "0x8fbbca9e637c6261386e38dfef016a7dd90fc65b",
+    swarmGateway: "https://api.gateway.ethswarm.org",
   };
   // The deployment's namespace (config.js), when the page sets one: only a valid namespace, nothing else.
-  // (LIKENESS_VERIFIER_DEFAULTS: legacy, still read.)
-  var pageDefaults = root.FACEVISA_VERIFIER_DEFAULTS || root.LIKENESS_VERIFIER_DEFAULTS;
+  var pageDefaults = root.FACEVISA_VERIFIER_DEFAULTS;
   var configured = pageDefaults && pageDefaults.namespace;
   if (typeof configured === "string" && /^[a-z][a-z0-9-]{0,31}$/.test(configured)) DEFAULTS.namespace = configured;
   var HEDERA_RAIL = "hedera-x402 (testnet)";
@@ -46,6 +46,8 @@
   var LICENSE_PAID = "0x0a016f4e8051c043d3530d2cb5957e9868a3bd6999f4e87027e4c509f22915a3";
 
   var HASH = /^0x[0-9a-f]{64}$/;
+  // A plain Swarm reference (content address). A longer one would carry a decryption key: never followed or shown.
+  var SWARM_REF = /^[0-9a-f]{64}$/;
   var ADDRESS = /^0x[0-9a-fA-F]{40}$/;
   var NAMESPACE = /^[a-z][a-z0-9-]{0,31}$/;
   var KEY = /^0x[0-9a-fA-F]{64}$/;
@@ -83,10 +85,24 @@
     return out;
   }
 
-  var RECEIPT_COLUMNS = { app: true, type: true, file_hash: true, licence_key: true, creator: true, licence_expires_at: true, licence_id: true, provider: true, model: true, job_id: true, payment_ref: true, payment_rail: true, payer: true, face_check: true, face_score: true };
+  var RECEIPT_COLUMNS = { app: true, type: true, file_hash: true, licence_key: true, creator: true, licence_expires_at: true, licence_id: true, provider: true, model: true, job_id: true, payment_ref: true, payment_rail: true, payer: true, swarm_ref: true, swarm_encrypted: true, face_check: true, face_score: true };
+  var STATS_COLUMNS = { app: true, type: true, creator: true, ads_approved: true, active_licences: true, revoked: true, earned_usdt: true, brands: true, first_listed: true, last_active: true };
   var LISTING_COLUMNS = { app: true, type: true, display_name: true, presence: true, credential: true };
   var REVOCATION_COLUMNS = { app: true, type: true, licence_key: true, file_hash: true, creator: true, revoked_at: true, licence_id: true };
   var LICENCE_COLUMNS = { app: true, type: true, output_hash: true, creator: true, brand: true, usage: true, kind: true, duration_days: true, price: true, status: true, identity: true, licence_id: true, approved_at: true };
+
+  /**
+   * A creator's running numbers, from their own stats entity on Arkiv (owned by their key, so it's theirs alone to
+   * write): ads approved, active licences, revoked, earned in USDT, distinct brands, when first listed and last active.
+   */
+  function statsView(e, link, creator) {
+    if (!e || String(e.owner).toLowerCase() !== String(creator).toLowerCase()) return null;
+    var a = attrs(e);
+    return { key: e.key, url: link(e.key), adsApproved: a.ads_approved || 0, activeLicences: a.active_licences || 0, revoked: a.revoked || 0, earnedUsdt: a.earned_usdt || 0, brands: a.brands || 0, firstListed: a.first_listed ? a.first_listed * 1000 : null, lastActive: a.last_active ? a.last_active * 1000 : null };
+  }
+  function statsQuery(cfg, ns, creator, fetchFn) {
+    return query(cfg, ns + " AND type = str('creator_stats') AND $owner = addr(" + creator + ")", STATS_COLUMNS, fetchFn, 1);
+  }
 
   function query(cfg, where, columns, fetchFn, limit) {
     return rpc(cfg, "arkiv_query", [where, { select: { key: true, owner: true, expiresAt: true, attributes: columns }, limit: "0x" + (limit || 10).toString(16) }], fetchFn);
@@ -224,6 +240,24 @@
     }
   }
 
+  /**
+   * The file on Swarm, as the receipt names it. A showcase file (not encrypted) is fetched from the public gateway and
+   * its sha256 compared with the file being checked; an encrypted one only its brand and creator can open, so it's
+   * named, not fetched. state: "match" | "mismatch" | "unreachable" | "encrypted". Never throws.
+   */
+  async function swarmFile(cfg, fetchFn, ref, encrypted, fileHash) {
+    var url = cfg.swarmGateway.replace(/\/$/, "") + "/bzz/" + ref + "/";
+    if (encrypted) return { ref: ref, url: url, encrypted: true, state: "encrypted" };
+    try {
+      var res = await fetchFn(url);
+      if (!res.ok) throw new Error("the gateway answered HTTP " + res.status);
+      var got = await sha256Hex(await res.arrayBuffer());
+      return { ref: ref, url: url, encrypted: false, state: got === String(fileHash).toLowerCase() ? "match" : "mismatch", sha256: got };
+    } catch (e) {
+      return { ref: ref, url: url, encrypted: false, state: "unreachable", error: e && e.message ? e.message : String(e) };
+    }
+  }
+
   /** The receipt's payment, checked where its rail settles; undefined for a test payment or an unknown rail. */
   function checkPayment(cfg, fetchFn, p) {
     if (p.rail === WHITECHAIN_RAIL && cfg.whitechainRpc && cfg.settlement) return whitechainPayment(cfg, fetchFn, p);
@@ -292,6 +326,7 @@
       creator: ra.creator || null, licenceEndsAt: ra.licence_expires_at ? ra.licence_expires_at * 1000 : null,
       licenceKey: ra.licence_key, licenceId: ra.licence_id, provider: ra.provider, model: ra.model, jobId: ra.job_id || null, paymentRef: ra.payment_ref, expiresAt: blockTime(r.expiresAt),
       paymentRail: ra.payment_rail || null, paymentLabel: paymentLabel(ra.payment_rail, ra.payment_ref), payer: ra.payer || null,
+      swarmRef: SWARM_REF.test(String(ra.swarm_ref || "")) ? ra.swarm_ref : null, swarmEncrypted: ra.swarm_encrypted === true || ra.swarm_encrypted === "true",
       faceCheck: ra.face_check || null, faceScore: typeof ra.face_score === "number" ? ra.face_score / 1000 : null,
     };
     checks.push({ ok: receipt.ownerOk, text: "receipt owned by " + (receiptAddress === DEFAULTS.receiptAddress.toLowerCase() ? "the published FaceVisa receipt address " : "the receipt address set for this check (not FaceVisa's published one) ") + cfg.receiptAddress });
@@ -326,7 +361,15 @@
     var out = { fileHash: fileHash, receipt: receipt, revocation: revocation, creatorName: creatorName, checks: checks, requests: requests, rateLimit: rateLimit };
     // 5. The payment, where it settled (the licence, when still on Arkiv, names the brand and the price).
     var paid = async function (result) {
+      // The creator's stats header, from their own stats entity (the receipt names the creator).
+      if (ADDRESS.test(String(receipt.creator || ""))) {
+        var st = await call(statsQuery(cfg, ns, receipt.creator, fetchFn));
+        result.creatorStats = statsView(st.data[0], link, receipt.creator);
+        result.requests = requests;
+        result.rateLimit = rateLimit;
+      }
       var la0 = l ? attrs(l) : null;
+      if (receipt.swarmRef && cfg.swarmGateway) result.swarm = await swarmFile(cfg, fetchFn, receipt.swarmRef, receipt.swarmEncrypted, fileHash);
       var pay = await checkPayment(cfg, fetchFn, { rail: receipt.paymentRail, ref: receipt.paymentRef, fileHash: fileHash, licenceId: receipt.licenceId || null, payer: receipt.payer, creator: receipt.creator || (la0 && la0.creator), brand: la0 ? la0.brand : null, amount: la0 && typeof la0.price === "number" ? la0.price : null });
       if (pay) result.payment = pay;
       return result;
@@ -397,6 +440,7 @@
       call(query(cfg, ns + " AND type = str('licence') AND $owner = addr(" + creator + ")", LICENCE_COLUMNS, fetchFn, USAGE_LIMIT)),
       call(query(cfg, ns + " AND type = str('revocation') AND $owner = addr(" + creator + ")", REVOCATION_COLUMNS, fetchFn, USAGE_LIMIT)),
       call(query(cfg, ns + " AND type = str('listing') AND $owner = addr(" + creator + ")", LISTING_COLUMNS, fetchFn)),
+      call(statsQuery(cfg, ns, creator, fetchFn)),
     ]);
     var receipts = answers[0].data, anyone = answers[1].data, licences = answers[2].data, revocations = answers[3].data;
     var named = answers[4].data[0];
@@ -415,6 +459,7 @@
         receipt: {
           key: r.key, url: link(r.key), licenceId: ra.licence_id, provider: ra.provider, model: ra.model, jobId: ra.job_id || null,
           paymentRef: ra.payment_ref, paymentRail: ra.payment_rail || null, paymentLabel: paymentLabel(ra.payment_rail, ra.payment_ref), payer: ra.payer || null,
+          swarmRef: SWARM_REF.test(String(ra.swarm_ref || "")) ? ra.swarm_ref : null, swarmEncrypted: ra.swarm_encrypted === true || ra.swarm_encrypted === "true",
           faceCheck: ra.face_check || null, faceScore: typeof ra.face_score === "number" ? ra.face_score / 1000 : null,
           licenceEndsAt: ra.licence_expires_at ? ra.licence_expires_at * 1000 : null,
         },
@@ -454,7 +499,7 @@
     var counts = {};
     items.forEach(function (i) { counts[i.verdict] = (counts[i.verdict] || 0) + 1; });
     return {
-      creator: creator, creatorName: creatorName, creatorPresence: creatorPresence, creatorCredential: creatorCredential, items: items, counts: counts,
+      creator: creator, creatorName: creatorName, creatorPresence: creatorPresence, creatorCredential: creatorCredential, creatorStats: statsView(answers[5].data[0], link, creator), items: items, counts: counts,
       ignored: { receipts: anyone.filter(function (x) { return lower(x.owner) !== receiptAddress; }).length, licencesWithoutReceipt: licences.filter(function (x) { return !used[lower(x.key)]; }).length },
       truncated: receipts.length >= USAGE_LIMIT, requests: requests, rateLimit: rateLimit,
     };
@@ -491,46 +536,91 @@
     return q;
   }
 
+  /** The creator's stats header: tiles for the numbers, then where they come from. */
+  function statsHtml(s, who) {
+    if (!s) return "";
+    var usd = "$" + (s.earnedUsdt / 1e6).toFixed(2);
+    var tile = function (value, label) { return "<div><b>" + esc(value) + "</b><span>" + esc(label) + "</span></div>"; };
+    return '<div class="stats" aria-label="' + esc(who) + ' stats">' + tile(s.adsApproved, "ads approved") + tile(s.activeLicences, "active licences") + tile(usd, "earned (USDT)") + tile(s.brands, s.brands === 1 ? "brand" : "brands") + tile(s.revoked, "revoked") + "</div>" +
+      '<p class="muted">From their own stats entity on Arkiv (' + linkTo(s.url, s.key.slice(0, 10) + "…") + ")" + (s.firstListed ? " · listed since " + esc(day(s.firstListed)) : "") + (s.lastActive ? " · last active " + esc(day(s.lastActive)) : "") + "</p>";
+  }
+  var day = function (ms) { return new Date(ms).toLocaleDateString(undefined, { dateStyle: "medium" }); };
+  var short = function (a) { return /^0x[0-9a-fA-F]{40}$/.test(String(a)) ? String(a).slice(0, 6) + "…" + String(a).slice(-4) : String(a); };
+  /** What made the ad, in a few words: the model's last path segment, and the face score. */
+  function madeBy(rc) {
+    if (rc.provider === "test") return "a TEST RENDER (no AI model)";
+    var model = String(rc.model).split("+").map(function (m) { return m.trim().replace(/^.*\//, ""); }).join(" + ");
+    return esc(model) + (rc.faceCheck === "passed" && rc.faceScore !== null ? " · face match " + rc.faceScore.toFixed(2) : "");
+  }
+  /** The World ID check from a creator's listing, as a chip (the full wording in its title). */
+  function presenceChip(presence, credential) {
+    if (!presence) return "";
+    var name = presence === "none" ? "No World ID check" : (credential === "selfie" ? "Selfie Check" : credential === "proof_of_human" ? "Proof of Human" : "World ID") + (presence === "production" ? "" : " · " + presence);
+    return '<span class="chip ' + (presence === "none" ? "" : "violet") + '" title="' + esc(presenceLabel(presence, credential)) + '">' + esc(name) + "</span>";
+  }
+  /** The banner when a link changed the trusted settings: never FaceVisa's verdict, and a way back. */
+  function customBanner(custom, answer, what) {
+    return '<div class="verdict-box Custom"><p class="verdict Custom">Not verified by FaceVisa (custom settings)</p><p>This ' + what + " trusts " + esc(custom.join(" and ")) + ", not FaceVisa's published " + (custom.length === 2 ? "ones" : "one") + "." + (answer ? " With these settings the answer is: <b>" + esc(answer) + "</b>." : "") + " Whoever chose them (perhaps the link you followed) decides what that means.</p><div><button type=\"button\" id=\"use-defaults\" class=\"btn-lime\">Use FaceVisa's published settings</button></div></div>";
+  }
+  /** The file on Swarm, in a line: a link and whether its bytes match, or that it's encrypted. */
+  function swarmHtml(w) {
+    if (w.state === "encrypted") return "encrypted · " + linkTo(w.url, w.ref.slice(0, 10) + "…") + ' <span class="muted">only the brand and the creator can open it</span>';
+    var head = linkTo(w.url, "open the file ↗");
+    if (w.state === "match") return head + ' <span class="ok">✓ same bytes as this file</span>';
+    if (w.state === "mismatch") return head + ' <span class="error">✗ the file on Swarm has a different sha256</span>';
+    return head + ' <span class="muted">(the gateway couldn\'t be reached from this browser)</span>';
+  }
+  var checksList = function (checks) { return '<ul class="checks">' + checks.map(function (c) { return "<li>" + (c.ok ? "✓ " : "✗ ") + esc(c.text) + "</li>"; }).join("") + "</ul>"; };
+
   /** The result of verify() as the page's HTML. settings: { receiptAddress, rpcUrl } as the person (or a link) set them. */
   function render(r, settings) {
     // A link can set the receipt address and the RPC. With any but FaceVisa's published ones, the page never shows a
     // verdict as FaceVisa's (no green "Licensed"): what those settings say is a detail, with a way back.
     var custom = customSettings(settings);
     var html;
-    if (custom.length) {
-      html = '<p class="verdict Custom">Not verified by FaceVisa (custom settings)</p>';
-      html += "<p>This check trusts " + esc(custom.join(" and ")) + ", not FaceVisa's published " + (custom.length === 2 ? "ones" : "one") + ". With these settings the answer is: <b>" + esc(HEADLINE[r.verdict] || r.verdict) + "</b>. Whoever chose them (perhaps the link you followed) decides what that means.</p>";
-      html += '<button type="button" id="use-defaults">Use FaceVisa\'s published settings</button>';
-    } else html = '<p class="verdict ' + r.verdict.replace(/ /g, "-") + '">' + esc(HEADLINE[r.verdict] || r.verdict) + "</p>";
-    if (r.verdict === "Revoked" && r.revokedAt) html += "<p><b>Revoked on " + esc(when(r.revokedAt)) + "</b> by the creator (their revocation record, owned by their key).</p>";
-    if (r.verdict === "Expired" && r.licenceEndedAt) html += "<p><b>Licence expired on " + esc(when(r.licenceEndedAt)) + "</b> (the end recorded on the receipt; the licence entity is gone from Arkiv).</p>";
-    if (r.verdict === "Licensed" && r.licence) html += "<p>In force until " + esc(when(r.licence.expiresAt)) + ".</p>";
-    if (r.checks.length) html += "<ul>" + r.checks.map(function (c) { return "<li>" + (c.ok ? "✓ " : "✗ ") + esc(c.text) + "</li>"; }).join("") + "</ul>";
+    var line = r.verdict === "Revoked" && r.revokedAt ? "Revoked on " + when(r.revokedAt) + " by the creator." : r.verdict === "Expired" && r.licenceEndedAt ? "The licence ended on " + when(r.licenceEndedAt) + "." : r.verdict === "Licensed" && r.licence ? "In force until " + when(r.licence.expiresAt) + "." : "";
+    if (custom.length) html = customBanner(custom, HEADLINE[r.verdict] || r.verdict, "check");
+    else html = '<div class="verdict-box ' + r.verdict.replace(/ /g, "-") + '"><p class="verdict ' + r.verdict.replace(/ /g, "-") + '">' + esc(HEADLINE[r.verdict] || r.verdict) + "</p>" + (line ? "<p>" + esc(line) + "</p>" : "") + "</div>";
+    if (r.licence) {
+      var who = r.creatorName ? esc(r.creatorName) : '<span class="mono">' + esc(short(r.licence.owner)) + "</span>";
+      html += '<div class="chips"><span class="chip lime">' + esc(r.licence.kind) + " · " + esc(r.licence.usage) + " · " + esc(r.licence.durationDays) + " days</span>" + (ADDRESS.test(String(r.licence.owner)) ? '<a class="chip" href="creator.html?creator=' + esc(r.licence.owner) + esc(settingsQuery(settings)) + '">' + who + " · every ad of this face →</a>" : "") + "</div>";
+    }
+    html += statsHtml(r.creatorStats, "The creator");
+    if (r.receipt) {
+      html += "<dl>";
+      if (r.licence) {
+        html += "<dt>Creator</dt><dd>" + (r.creatorName ? "<b>" + esc(r.creatorName) + "</b> " : "") + '<span class="mono">' + esc(short(r.licence.owner)) + "</span></dd>";
+        html += '<dt>Brand</dt><dd class="mono">' + esc(short(r.licence.brand)) + "</dd>";
+        if (r.licence.approvedAt) html += "<dt>Approved</dt><dd>" + esc(when(r.licence.approvedAt)) + "</dd>";
+      }
+      html += "<dt>Made with</dt><dd>" + madeBy(r.receipt) + "</dd>";
+      if (r.swarm) html += "<dt>On Swarm</dt><dd>" + swarmHtml(r.swarm) + "</dd>";
+      html += "<dt>Payment</dt><dd>" + esc(r.receipt.paymentLabel) + (r.payment ? " · " + linkTo(r.payment.link, String(r.receipt.paymentRef).length > 20 ? String(r.receipt.paymentRef).slice(0, 10) + "…" : r.receipt.paymentRef) + (r.payment.state === "confirmed" ? ' <span class="ok">✓ confirmed</span>' : "") : "") + "</dd>";
+      html += "</dl>";
+    }
+    var ok = r.checks.filter(function (c) { return c.ok; }).length;
+    html += "<details><summary>" + (r.checks.length ? ok + " of " + r.checks.length + " checks passed · details" : "Details") + '</summary><div style="display:flex;flex-direction:column;gap:12px">';
+    if (r.checks.length) html += checksList(r.checks);
     html += "<dl>";
-    html += "<dt>File SHA-256</dt><dd class=\"mono\">" + esc(r.fileHash) + "</dd>";
+    html += '<dt>File SHA-256</dt><dd class="mono">' + esc(r.fileHash) + "</dd>";
     if (r.receipt) {
       html += "<dt>Receipt</dt><dd>" + linkTo(r.receipt.url, r.receipt.key) + "</dd>";
-      html += "<dt>Receipt owner</dt><dd class=\"mono\">" + esc(r.receipt.owner) + "</dd>";
+      html += '<dt>Receipt owner</dt><dd class="mono">' + esc(r.receipt.owner) + "</dd>";
       // A 0G file: its request on 0G's record (whether 0G verified a TEE signature isn't on Arkiv, so never claimed here).
-      var made = r.receipt.provider === "test" ? "a TEST RENDER (no AI model)" : esc(r.receipt.model) + " (" + esc(r.receipt.provider) + ")" + (r.receipt.jobId ? (String(r.receipt.provider).split("+").indexOf("0g") >= 0 ? ", 0G request record " : ", request ") + esc(r.receipt.jobId) : "");
-      if (r.receipt.faceCheck) made += " · face check " + (r.receipt.faceCheck === "passed" ? "passed" + (r.receipt.faceScore !== null ? " (" + r.receipt.faceScore.toFixed(3) + ")" : "") : "not run");
-      html += "<dt>Made by</dt><dd>" + made + "</dd>";
-      html += "<dt>Payment</dt><dd>" + esc(r.receipt.paymentLabel) + " " + (r.payment ? linkTo(r.payment.link, r.receipt.paymentRef) : "<span class=\"mono muted\">" + esc(r.receipt.paymentRef) + "</span>") + "</dd>";
+      html += "<dt>Model</dt><dd>" + (r.receipt.provider === "test" ? "a TEST RENDER (no AI model)" : esc(r.receipt.model) + " (" + esc(r.receipt.provider) + ")" + (r.receipt.jobId ? (String(r.receipt.provider).split("+").indexOf("0g") >= 0 ? ", 0G request record " : ", request ") + esc(r.receipt.jobId) : "")) + "</dd>";
       if (r.payment) html += "<dt>" + (r.payment.rail === "whitechain" ? "On Whitechain" : "On Hedera") + "</dt><dd>" + paymentHtml(r.payment) + "</dd>";
-      if (r.receipt.licenceEndsAt) html += "<dt>Licence ends (receipt)</dt><dd>" + esc(when(r.receipt.licenceEndsAt)) + "</dd>";
+      if (r.receipt.licenceEndsAt) html += "<dt>Licence ends</dt><dd>" + esc(when(r.receipt.licenceEndsAt)) + "</dd>";
     }
     if (r.revocation) html += "<dt>Revocation record</dt><dd>" + linkTo(r.revocation.url, r.revocation.key) + "</dd>";
     if (r.licence) {
       html += "<dt>Licence</dt><dd>" + linkTo(r.licence.url, r.licence.key) + " (" + esc(r.licence.licenceId) + ")</dd>";
-      html += "<dt>Status</dt><dd>" + esc(r.licence.status) + "</dd>";
-      html += "<dt>Entity expires</dt><dd>" + esc(when(r.licence.expiresAt)) + "</dd>";
-      html += "<dt>Identity</dt><dd>" + esc(r.licence.identityLabel) + " <span class=\"muted\">(identity = " + esc(r.licence.identity) + ")</span></dd>";
-      html += "<dt>Usage</dt><dd>" + esc(r.licence.kind) + " for " + esc(r.licence.usage) + ", " + esc(r.licence.durationDays) + " days</dd>";
-      html += "<dt>Creator (owner)</dt><dd>" + (r.creatorName ? "<b>" + esc(r.creatorName) + "</b> <span class=\"muted\">(their listing on Arkiv)</span> · " : "") + "<span class=\"mono\">" + esc(r.licence.owner) + "</span>" + (ADDRESS.test(String(r.licence.owner)) ? ' · <a href="creator.html?creator=' + esc(r.licence.owner) + esc(settingsQuery(settings)) + '">where else their face is used</a>' : "") + "</dd>";
-      html += "<dt>Brand</dt><dd class=\"mono\">" + esc(r.licence.brand) + "</dd>";
+      html += "<dt>Status</dt><dd>" + esc(r.licence.status) + " · entity expires " + esc(when(r.licence.expiresAt)) + "</dd>";
+      html += "<dt>Approval</dt><dd>" + esc(r.licence.identityLabel) + ' <span class="muted">(identity = ' + esc(r.licence.identity) + ")</span></dd>";
+      html += '<dt>Brand address</dt><dd class="mono">' + esc(r.licence.brand) + "</dd>";
     }
     html += "</dl>";
     html += '<p class="muted">' + r.requests + " requests to " + esc(settings.rpcUrl) + (r.rateLimit ? " · rate limit now: <code>" + esc(r.rateLimit) + "</code>" : "") + "</p>";
+    html += "</div></details>";
     return html;
   }
   /** The chain's answer about the payment, or why there isn't one (then the explorer is the place to look). */
@@ -549,7 +639,7 @@
   /** A payment's on-chain answer, in one line. */
   function paymentShort(p) {
     if (!p) return "";
-    if (p.state === "confirmed") return " · ✓ confirmed by " + esc(p.source) + (p.payer ? " (" + esc(p.payer) + " → " + esc(p.payee) + ")" : "");
+    if (p.state === "confirmed") return ' · <span class="ok" title="' + esc(p.payer ? p.payer + " → " + p.payee : "") + '">✓ confirmed by ' + esc(p.source) + "</span>";
     if (p.state === "mismatch") return ' · <span class="error">✗ ' + esc(p.source) + " doesn't match: " + esc(p.checks.filter(function (c) { return !c.ok; }).map(function (c) { return c.text; }).join("; ")) + "</span>";
     if (p.state === "not-found") return " · not on " + esc(p.source) + " (yet)";
     return " · " + esc(p.source) + " couldn't be reached (" + esc(p.error) + ")";
@@ -558,38 +648,37 @@
   /** The result of creatorUsage() as the page's HTML. settings: { namespace, receiptAddress, rpcUrl }. */
   function renderCreator(r, settings) {
     var custom = customSettings(settings);
-    var who = r.creatorName ? "<b>" + esc(r.creatorName) + "</b> (" + '<span class="mono">' + esc(r.creator) + "</span>)" : '<span class="mono">' + esc(r.creator) + "</span>";
     var summary = ["Licensed", "Revoked", "Expired", "Not trusted", "Inconsistent"].filter(function (v) { return r.counts[v]; }).map(function (v) { return r.counts[v] + " " + SHORT[v].toLowerCase(); }).join(" · ");
-    var html;
-    if (custom.length) {
-      html = '<p class="verdict Custom">Not verified by FaceVisa (custom settings)</p>';
-      html += "<p>This list trusts " + esc(custom.join(" and ")) + ", not FaceVisa's published " + (custom.length === 2 ? "ones" : "one") + ". Whoever chose them (perhaps the link you followed) decides what it means.</p>";
-      html += '<button type="button" id="use-defaults">Use FaceVisa\'s published settings</button>';
-    } else html = '<p class="verdict">' + (r.items.length ? r.items.length + (r.items.length === 1 ? " file" : " files") : "No files") + "</p>";
-    html += "<p>The face of " + who + (r.items.length ? ": " + esc(summary) + "." : ": no FaceVisa receipt names this creator in this namespace.") + (r.creatorName ? ' <span class="muted">(the name is from their own listing on Arkiv)</span>' : "") + "</p>";
-    if (r.creatorPresence) html += "<p>" + esc(presenceLabel(r.creatorPresence, r.creatorCredential)) + ' <span class="muted">(presence = ' + esc(r.creatorPresence) + (r.creatorCredential ? ", credential = " + esc(r.creatorCredential) : "") + ", from their listing on Arkiv)</span></p>";
-    r.items.forEach(function (i) {
-      var l = i.licence;
-      var head = SHORT[i.verdict] + (i.verdict === "Revoked" && i.revokedAt ? " on " + when(i.revokedAt) : i.verdict === "Expired" && i.endedAt ? " on " + when(i.endedAt) : i.verdict === "Licensed" && l ? " until " + when(l.expiresAt) : "");
-      html += '<article class="item"><p><span class="pill ' + i.verdict.replace(/ /g, "-") + '">' + esc(head) + "</span> " + (l ? "<b>" + esc(l.kind) + " for " + esc(l.usage) + ", " + esc(l.durationDays) + " days</b>" : '<b>licence ' + esc(i.receipt.licenceId) + '</b> <span class="muted">(its entity is gone from Arkiv)</span>') + "</p><dl>";
-      html += '<dt>File</dt><dd><span class="mono">' + esc(i.fileHash) + '</span> · <a href="index.html?hash=' + esc(i.fileHash) + esc(settingsQuery(settings)) + '">verify this file</a></dd>';
-      if (l) {
-        html += '<dt>Brand</dt><dd class="mono">' + esc(l.brand) + "</dd>";
-        if (l.approvedAt) html += "<dt>Approved</dt><dd>" + esc(when(l.approvedAt)) + ", " + esc(l.identityLabel) + "</dd>";
-      }
-      html += "<dt>Made by</dt><dd>" + (i.receipt.provider === "test" ? "a TEST RENDER (no AI model)" : esc(i.receipt.model) + " (" + esc(i.receipt.provider) + ")") + (i.receipt.faceCheck === "passed" && i.receipt.faceScore !== null ? " · face check passed (" + i.receipt.faceScore.toFixed(3) + ")" : "") + "</dd>";
-      html += "<dt>Payment</dt><dd>" + esc(i.receipt.paymentLabel) + " " + (i.payment ? linkTo(i.payment.link, i.receipt.paymentRef) : '<span class="mono muted">' + esc(i.receipt.paymentRef) + "</span>") + paymentShort(i.payment) + "</dd>";
-      html += "<dt>On Arkiv</dt><dd>receipt " + linkTo(i.receipt.url, i.receipt.key.slice(0, 10) + "…") + (l ? " · licence " + linkTo(l.url, l.key.slice(0, 10) + "…") : "") + (i.revocation ? " · revocation " + linkTo(i.revocation.url, i.revocation.key.slice(0, 10) + "…") : "") + "</dd>";
-      html += "</dl></article>";
-    });
+    var html = custom.length ? customBanner(custom, null, "list") : "";
+    html += '<div class="profile"><h2>' + (r.creatorName ? esc(r.creatorName) : "Unnamed creator") + '</h2><p class="mono addr">' + esc(r.creator) + '</p><div class="chips">' + presenceChip(r.creatorPresence, r.creatorCredential) +
+      '<span class="chip">' + (r.items.length ? r.items.length + (r.items.length === 1 ? " file" : " files") + (summary ? " · " + esc(summary) : "") : "No files yet") + "</span></div></div>";
+    html += statsHtml(r.creatorStats, r.creatorName || "This creator");
+    if (r.items.length) {
+      html += '<div class="ads">';
+      r.items.forEach(function (i) {
+        var l = i.licence;
+        var head = SHORT[i.verdict] + (i.verdict === "Revoked" && i.revokedAt ? " · " + day(i.revokedAt) : i.verdict === "Expired" && i.endedAt ? " · " + day(i.endedAt) : i.verdict === "Licensed" && l ? " until " + day(l.expiresAt) : "");
+        html += '<article class="ad"><div class="ad-head"><div><span class="pill ' + i.verdict.replace(/ /g, "-") + '">' + esc(head) + "</span></div><h3>" + (l ? esc(l.kind) + " · " + esc(l.usage) + " · " + esc(l.durationDays) + " days" : "Licence " + esc(i.receipt.licenceId)) + "</h3>" + (l ? "" : '<p class="muted">Its licence entity is gone from Arkiv.</p>') + "</div><dl>";
+        if (l) {
+          html += '<dt>Brand</dt><dd class="mono">' + esc(short(l.brand)) + "</dd>";
+          if (l.approvedAt) html += "<dt>Approved</dt><dd>" + esc(day(l.approvedAt)) + "</dd>";
+        }
+        html += "<dt>Made with</dt><dd>" + madeBy(i.receipt) + "</dd>";
+        html += "<dt>Paid</dt><dd>" + (l && typeof l.price === "number" && /whitechain|hedera/.test(String(i.receipt.paymentRail)) ? esc((l.price / 1e6).toFixed(2)) + " " : "") + esc(i.receipt.paymentLabel) + paymentShort(i.payment) + "</dd>";
+        html += "</dl>";
+        html += '<div class="actions"><a class="btn btn-ghost" href="index.html?hash=' + esc(i.fileHash) + esc(settingsQuery(settings)) + '">Verify file</a>' + (i.payment ? '<a class="btn btn-ghost" href="' + esc(i.payment.link) + '" target="_blank" rel="noreferrer">Payment ↗</a>' : "") + (i.receipt.swarmRef && !i.receipt.swarmEncrypted ? '<a class="btn btn-ghost" href="' + esc(settings.swarmGateway || DEFAULTS.swarmGateway) + "/bzz/" + esc(i.receipt.swarmRef) + '/" target="_blank" rel="noreferrer">On Swarm ↗</a>' : "") + "</div>";
+        html += '<p class="links">On Arkiv: ' + linkTo(i.receipt.url, "receipt") + (l ? " · " + linkTo(l.url, "licence") : "") + (i.revocation ? " · " + linkTo(i.revocation.url, "revocation") : "") + (i.receipt.swarmRef && i.receipt.swarmEncrypted ? " · encrypted on Swarm" : "") + "</p>";
+        html += "</article>";
+      });
+      html += "</div>";
+    } else html += '<p class="muted">No FaceVisa receipt names this creator in this namespace.</p>';
     var notes = [];
     if (r.truncated) notes.push("showing the first " + USAGE_LIMIT + " receipts");
     if (r.ignored.receipts) notes.push(r.ignored.receipts + " receipt-like entit" + (r.ignored.receipts === 1 ? "y" : "ies") + " naming this creator from other addresses ignored (not FaceVisa's)");
     if (r.ignored.licencesWithoutReceipt) notes.push(r.ignored.licencesWithoutReceipt + " licence entit" + (r.ignored.licencesWithoutReceipt === 1 ? "y" : "ies") + " owned by this creator with no FaceVisa receipt (not counted)");
-    html += '<p class="muted">' + (notes.length ? esc(notes.join("; ")) + ". " : "") + r.requests + " requests to " + esc(settings.rpcUrl) + (r.rateLimit ? " · rate limit now: <code>" + esc(r.rateLimit) + "</code>" : "") + "</p>";
+    if (notes.length) html += '<p class="muted">' + esc(notes.join("; ")) + ".</p>";
     return html;
   }
 
-  // LikenessVerifier: a legacy alias.
-  root.FaceVisaVerifier = root.LikenessVerifier = { DEFAULTS: DEFAULTS, verify: verify, sha256Hex: sha256Hex, identityLabel: identityLabel, presenceLabel: presenceLabel, paymentLabel: paymentLabel, hederaPayment: hederaPayment, whitechainPayment: whitechainPayment, mirrorTxId: mirrorTxId, render: render, esc: esc, creatorUsage: creatorUsage, renderCreator: renderCreator };
+  root.FaceVisaVerifier = { statsHtml: statsHtml, DEFAULTS: DEFAULTS, verify: verify, sha256Hex: sha256Hex, identityLabel: identityLabel, presenceLabel: presenceLabel, paymentLabel: paymentLabel, hederaPayment: hederaPayment, whitechainPayment: whitechainPayment, swarmFile: swarmFile, mirrorTxId: mirrorTxId, render: render, esc: esc, creatorUsage: creatorUsage, renderCreator: renderCreator };
 })(typeof globalThis !== "undefined" ? globalThis : this);

@@ -6,8 +6,22 @@
  */
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import type { SwarmView } from "@/lib/facevisa";
 
-export function MediaTile({ file, mime, caption, verifyHash, large = false }: { file: string; mime: string; caption?: string; verifyHash?: string; large?: boolean }) {
+const ENCRYPTED_NOTE = "Swarm keeps this ad encrypted: only the brand and the creator open it, here in FaceVisa. The link serves the encrypted bytes.";
+
+/** The ad's file on Swarm: a link to it on the public gateway (marked when encrypted), or "Uploading to Swarm…". */
+export function SwarmLink({ s, className = "underline" }: { s?: SwarmView | null; className?: string }) {
+  if (!s || s.state === "failed") return null;
+  if (s.state !== "uploaded") return <span className="text-grey">Uploading to Swarm…</span>;
+  return (
+    <a href={s.url} target="_blank" rel="noreferrer" className={className} title={s.encrypted ? ENCRYPTED_NOTE : `The same file, on Swarm (reference ${s.ref})`}>
+      {s.encrypted ? "On Swarm, encrypted ↗" : "On Swarm ↗"}
+    </a>
+  );
+}
+
+export function MediaTile({ file, mime, caption, verifyHash, swarm, large = false }: { file: string; mime: string; caption?: string; verifyHash?: string; swarm?: SwarmView | null; large?: boolean }) {
   const [src, setSrc] = useState<string | null>(null);
   // Why there's no file (e.g. the public demo deleted it after 48 hours), instead of a placeholder forever.
   const [missing, setMissing] = useState<string | null>(null);
@@ -37,13 +51,19 @@ export function MediaTile({ file, mime, caption, verifyHash, large = false }: { 
       ) : (
         <span className={`block animate-pulse rounded-[12px] bg-paper ${large ? "h-64" : "aspect-square"} w-full`} />
       )}
-      {(caption || verifyHash) && (
+      {(caption || verifyHash || (swarm && swarm.state !== "failed")) && (
         <figcaption className="text-[12px] text-grey">
           {caption}
           {verifyHash && (
             <>
               {caption ? " · " : ""}
               <Link href={`/verify?hash=${verifyHash}`}>Verify</Link>
+            </>
+          )}
+          {swarm && swarm.state !== "failed" && (
+            <>
+              {caption || verifyHash ? " · " : ""}
+              <SwarmLink s={swarm} />
             </>
           )}
         </figcaption>

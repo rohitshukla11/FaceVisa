@@ -9,6 +9,7 @@ import { IconCheck, IconCross, IconQuestion } from "@/components/ds/icons";
 import { when, type FaceVisaVerify } from "@/lib/facevisa";
 import { ArkivLine } from "./ArkivLine";
 import { PaymentLine, onChain, paymentLabel } from "./PaymentLine";
+import { SwarmLink } from "./ReceiptTile";
 import { SourceLabel } from "./SourceLabel";
 
 const LOOK = {
@@ -97,6 +98,12 @@ export function FaceVisaVerdict({ v }: { v: FaceVisaVerify }) {
               </a>{" "}
               {v.arkiv.licence.ownerOk ? `· owned by the creator's key${v.arkiv.creatorName ? ` (${v.arkiv.creatorName}, from their listing on Arkiv)` : ""} ✓` : "· NOT owned by the creator's key"} · {v.arkiv.licence.status} · ends {when(v.arkiv.licence.expiresAt)} ·{" "}
               {v.arkiv.licence.identity === "demo" ? "approved by the creator in FaceVisa (a demo identity)" : v.arkiv.licence.identity === "google" ? "approved by the creator in FaceVisa (signed in with Google)" : v.arkiv.licence.identity === "world-id" ? "approved by the creator in FaceVisa" : "approved by the creator in FaceVisa (local dev sign-in, a test identity)"}
+            </p>
+          )}
+          {v.swarm?.state === "uploaded" && (
+            <p className="m-0 break-all text-[13px]">
+              The file on Swarm <span className="font-mono">{v.swarm.ref.slice(0, 10)}…</span>, named by the receipt:{" "}
+              <SwarmLink s={v.swarm} />
             </p>
           )}
           {v.arkiv.problems.map((p) => (

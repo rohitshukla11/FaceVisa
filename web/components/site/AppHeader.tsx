@@ -8,6 +8,7 @@ import { SignIn } from "./SignIn";
 
 const NAV = [
   { href: "/dashboard", label: "Dashboard" },
+  { href: "/creators", label: "Creators" },
   { href: "/verify", label: "Verify" },
   { href: "/how", label: "How it works" },
 ];
@@ -18,7 +19,7 @@ export function AppHeader() {
     <header className="on-dark text-white">
       <div className="border-b border-ink-line">
         <div className="mx-auto flex max-w-[1320px] flex-wrap items-center gap-x-7 gap-y-3 px-4 py-[18px] sm:px-8">
-          <Link href="/" aria-label="Likeness home" className="flex h-11 w-11 items-center justify-center rounded-full bg-ink-raised text-white">
+          <Link href="/" aria-label="FaceVisa home" className="flex h-11 w-11 items-center justify-center rounded-full bg-ink-raised text-white">
             <IconPerson size={20} />
           </Link>
           <nav aria-label="App" className="order-3 flex w-full flex-wrap gap-x-5 gap-y-1 text-[14px] font-medium sm:order-none sm:w-auto sm:flex-1 sm:gap-x-7 sm:text-[15px]">

@@ -5,6 +5,7 @@
  * up) and Sign out. After a sign-in that didn't complete, says why (the callback's ?signin=…).
  */
 import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { btnClass, pillClass } from "@/components/ds";
 import { post } from "@/lib/api";
@@ -22,6 +23,8 @@ export const SIGNIN_NOTICES: Record<string, string> = {
 
 export function SignIn({ light = false }: { light?: boolean }) {
   const { user, me, signIn, signOut, refreshMe } = useAuth();
+  const router = useRouter();
+  const path = usePathname();
   const [notice, setNotice] = useState<string | null>(null);
 
   // Show the callback's outcome once, then drop it from the address bar.
@@ -49,9 +52,11 @@ export function SignIn({ light = false }: { light?: boolean }) {
     );
 
   const role = me?.account?.role;
+  // Each workspace lives on the dashboard: switching from another page (a request, a spend) goes there.
   const switchTo = async (to: "creator" | "brand") => {
     await post("/api/me/role", { role: to });
     await refreshMe();
+    if (path !== "/dashboard") router.push("/dashboard");
   };
   const text = light ? "text-ink" : "text-white";
   const name = user.name || "Your account";

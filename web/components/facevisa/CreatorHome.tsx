@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * A listed creator's dashboard. Their face (only they see the capture), status chips (listed, the World ID check, the
+ * A listed creator's dashboard. Their face (signed-in brands see it on the listing, never on Arkiv), status chips (listed, the World ID check, the
  * listing on Arkiv, where brands pay them on chain), what they've earned, the ads waiting for their approval (nothing is released
  * until they approve the actual ad, in FaceVisa), every ad made with their face, their rules, and the public page that
  * shows where their face is used, read straight from Arkiv.
@@ -18,7 +18,7 @@ import { ItemSource, SourceLabel } from "./SourceLabel";
 import { PresenceBadge } from "./PresenceBadge";
 import { PresenceCard } from "./PresenceCard";
 import { RulesForm } from "./RulesForm";
-import { MediaTile } from "./ReceiptTile";
+import { MediaTile, SwarmLink } from "./ReceiptTile";
 import { YouTubeCard } from "./YouTubeCard";
 
 const OPEN = ["generating", "review", "verified"];
@@ -344,7 +344,7 @@ function Face({ photo, name }: { photo: string | null; name: string }) {
     };
   }, [photo]);
   return (
-    <div className="relative h-28 w-28 overflow-hidden rounded-[26px] bg-paper ring-4 ring-lime" title="Your live capture: only you see it">
+    <div className="relative h-28 w-28 overflow-hidden rounded-[26px] bg-paper ring-4 ring-lime" title="Your live capture: signed-in brands see it on your listing; never on Arkiv">
       {src ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={src} alt="Your live capture" className="h-full w-full object-cover" />
@@ -415,6 +415,7 @@ function AdCard({ l, onRevoked }: { l: LicenceView; onRevoked: () => Promise<unk
               Payment ↗
             </a>
           )}
+          {r?.swarm?.state === "uploaded" && <SwarmLink s={r.swarm} className={OUTLINE} />}
           {l.status === "active" && (
             <button
               type="button"

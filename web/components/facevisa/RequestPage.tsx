@@ -150,7 +150,7 @@ export function RequestPage({ id }: { id: string }) {
             {r.status === "paying" && <SlowStep status={r.status} kind={r.kind} since={r.stepAt} ai={meta?.ai} rail={meta?.payments?.rail} />}
             {r.request && r.output ? (
               <div className="grid grid-cols-1 gap-4 md:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
-                {r.output.file && <MediaTile file={r.output.file} mime={r.output.mime} large caption={`${r.output.provider === "test" ? "TEST RENDER (no AI)" : r.output.model} · face check ${r.output.faceCheck === "passed" ? "passed" : "not run"}${r.generation > 1 ? " · second version" : ""}`} />}
+                {r.output.file && <MediaTile file={r.output.file} mime={r.output.mime} swarm={r.output.swarm} large caption={`${r.output.provider === "test" ? "TEST RENDER (no AI)" : r.output.model} · face check ${r.output.faceCheck === "passed" ? "passed" : "not run"}${r.generation > 1 ? " · second version" : ""}`} />}
                 <dl className="m-0 grid h-fit grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-[15px]">
                   <dt className="text-grey">Brief</dt>
                   <dd className="m-0 font-semibold">“{r.request.brief}”</dd>

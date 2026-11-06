@@ -60,6 +60,15 @@ const ARKIV_OFF: Source = { from: "facevisa", why: "Arkiv is off on this server"
 export const arkivStatus = (rt: Runtime, kind: EntityKind, subject: string): SyncStatus => rt.arkiv?.status(kind, subject) ?? { state: "off" };
 /** A listed creator's face URL (signed-in accounts only), or null without a capture. */
 const faceUrl = (rt: Runtime, uid: string) => (rt.accounts.creator(uid)?.photoFile ? `/api/facevisa/creators/${uid}/face` : null);
+/**
+ * A released ad's file on Swarm, for the pages that show the ad: its gateway link, and whether it's encrypted (only its
+ * brand and creator open it, in FaceVisa); "pending" while it uploads. null when Swarm is off or the ad predates it.
+ */
+export function swarmView(rt: Runtime, hash: string) {
+  const s = rt.swarm?.status(hash);
+  if (!s) return null;
+  return s.state === "uploaded" ? { state: s.state, ref: s.ref, url: s.url, encrypted: s.encrypted } : { state: s.state };
+}
 const outputFile = (a: PendingAction) => `/api/facevisa/outputs/${a.id}/file`;
 const outputView = (a: PendingAction) =>
   a.output && { hash: a.output.hash, mime: a.output.mime, provider: a.output.provider, model: a.output.model, requestId: a.output.requestId, faceCheck: a.output.faceCheck, faceScore: a.output.faceScore, createdAt: a.output.createdAt };
@@ -85,7 +94,7 @@ export function requestForCreator(rt: Runtime, a: PendingAction) {
     licenceId: a.licenceId,
     arkiv: arkivStatus(rt, "request", a.id),
     request: { brief: a.brief, category: a.category, durationDays: a.durationDays, price: usd(a.price) },
-    output: revealed ? { ...outputView(a), file: outputFile(a) } : null,
+    output: revealed ? { ...outputView(a), file: outputFile(a), swarm: a.status === "released" ? swarmView(rt, a.output!.hash) : null } : null,
   };
 }
 
@@ -108,7 +117,7 @@ export function requestForBrand(rt: Runtime, a: PendingAction) {
     expiresAt: a.expiresAt,
     reason: a.reason,
     licenceId: a.licenceId,
-    output: a.output ? { ...outputView(a), file: a.status === "released" ? `/api/receipts/${a.output.hash}/file` : null } : null,
+    output: a.output ? { ...outputView(a), file: a.status === "released" ? `/api/receipts/${a.output.hash}/file` : null, swarm: a.status === "released" ? swarmView(rt, a.output.hash) : null } : null,
     // "approved by the creator in FaceVisa", with how the creator signed in (dev, demo).
     consent: a.creatorCheck.decidedAt && a.creatorCheck.evidence ? { method: consentMethod(a.creatorCheck.evidence.iss), approvedAt: a.creatorCheck.decidedAt } : null,
     // "spend approved by the brand": null until it's needed.
@@ -156,7 +165,7 @@ function licenceView(rt: Runtime, l: Licence) {
     status: l.status,
     createdAt: l.createdAt,
     expiresAt: l.expiresAt,
-    receipt: r && { hash: r.hash, mime: r.mime, provider: r.provider, model: r.model, faceCheck: r.faceCheck, faceScore: r.faceScore, paymentRef: r.paymentRef, paymentRail: rt.core.data.payment(r.paymentId)?.rail ?? null, payment: paymentView(rt, r.paymentId, r.paymentRef, l.price), releasedAt: r.releasedAt, file: `/api/receipts/${r.hash}/file` },
+    receipt: r && { hash: r.hash, mime: r.mime, provider: r.provider, model: r.model, faceCheck: r.faceCheck, faceScore: r.faceScore, paymentRef: r.paymentRef, paymentRail: rt.core.data.payment(r.paymentId)?.rail ?? null, payment: paymentView(rt, r.paymentId, r.paymentRef, l.price), releasedAt: r.releasedAt, file: `/api/receipts/${r.hash}/file`, swarm: swarmView(rt, r.hash) },
     arkiv: { licence: arkivStatus(rt, "licence", l.id), receipt: arkivStatus(rt, "receipt", l.outputHash.toLowerCase()), ...(l.status === "revoked" ? { revocation: arkivStatus(rt, "revocation", l.id) } : {}) },
   };
 }
@@ -323,7 +332,7 @@ export async function facevisaRoutes(c: Ctx): Promise<boolean> {
       arkiv: onArkiv,
       sync,
       // The file on Swarm: a public gateway link for a showcase ad; an encrypted one only its brand and creator open.
-      swarm: rt.swarm?.status(r.hash) ?? null,
+      swarm: swarmView(rt, r.hash),
       namespace: rt.arkiv?.prefix ?? null, fileHash: hash.toLowerCase(),
     });
   }

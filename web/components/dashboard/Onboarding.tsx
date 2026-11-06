@@ -14,6 +14,7 @@ import { RulesForm } from "@/components/facevisa/RulesForm";
 import { LivenessCapture, type Capture } from "@/components/facevisa/LivenessCapture";
 import { PresenceCard } from "@/components/facevisa/PresenceCard";
 import { useAuth } from "@/components/site/Auth";
+import { getJson, type Meta } from "@/lib/facevisa";
 
 export function ChooseRole({ onDone, initialName = "" }: { onDone: () => Promise<unknown>; initialName?: string }) {
   const [busy, setBusy] = useState<Role | null>(null);
@@ -121,6 +122,9 @@ export function CaptureStep({ me, onSaved }: { me: Me; onSaved: () => Promise<un
   // The public demo's 48-hour rule applies to its public accounts (Google, demo identities): said next to the consent.
   const demoRetention = demo && (me.account?.signIn === "demo" || me.account?.signIn === "google") ? demo.retentionHours : null;
   const [consent, setConsent] = useState(false);
+  // Swarm, when the server uploads released ads there: until when its postage batch keeps them.
+  const [swarm, setSwarm] = useState<{ storedUntil: number | null } | null>(null);
+  useEffect(() => void getJson<Meta>("/api/facevisa").then((m) => setSwarm(m.swarm ?? null), () => undefined), []);
   const [capturing, setCapturing] = useState(!c.photo);
   const [capture, setCapture] = useState<Capture | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
@@ -182,11 +186,17 @@ export function CaptureStep({ me, onSaved }: { me: Me; onSaved: () => Promise<un
       <LivenessCapture onDone={onDone} />
       <label className="flex items-start gap-2 text-[14px]">
         <input type="checkbox" className="mt-1 h-4 w-4" checked={consent} onChange={(e) => setConsent(e.target.checked)} />
-        <span>I consent to brands&apos; agents making ads of me from this capture, each one released only after I approve it.</span>
+        <span>I consent to brands&apos; agents making ads of me from this capture, each one released only after I approve it. Once I&apos;m listed, signed-in brands see this capture&apos;s first frame on my listing (never on Arkiv).</span>
       </label>
       {demoRetention !== null && (
         <p role="note" className="m-0 rounded-[12px] bg-paper p-3 text-[13px]">
-          Your photo is sent to 0G (ByteDance Seedream) or Google Vertex to generate ads, and deleted from FaceVisa after {demoRetention} hours. The ads made of you are deleted after {demoRetention} hours too. Arkiv, the public record, only ever holds hashes (of your ads, licences and receipts), never your photo or an ad.
+          Your photo is sent to 0G (ByteDance Seedream) or Google Vertex to generate ads, and deleted from FaceVisa after {demoRetention} hours. The ads made of you are deleted from FaceVisa&apos;s server after {demoRetention} hours too. Arkiv, the public record, only ever holds hashes (of your ads, licences and receipts), never your photo or an ad.
+          {swarm && (
+            <>
+              {" "}
+              Each ad you approve is also stored on Swarm (decentralised storage){swarm.storedUntil ? ` until ${new Date(swarm.storedUntil).toLocaleDateString(undefined, { dateStyle: "medium" })}` : " for about 7 days"}, encrypted so only you and the brand can open it; only its encrypted address goes on Arkiv.
+            </>
+          )}
         </p>
       )}
       <button type="button" disabled={busy || !capture || !consent} onClick={() => void save()} className={btnClass("ink", "self-start")}>

@@ -72,6 +72,8 @@ export interface Meta {
   arkiv: { on: boolean; namespace?: string | null };
   /** Pay to release over x402 on Hedera testnet, and the brand agent's audit log on an HCS topic. */
   hedera?: { x402: boolean; audit?: { topic: string | null; url: string | null; sent: number; pending: number } | null };
+  /** Released ads on Swarm: the public gateway, and until when the batch keeps them (ms). */
+  swarm?: { gateway: string; storedUntil: number | null } | null;
   /** How brands pay creators on this server: USDT on Whitechain (the default), USDC on Hedera, or null for test payments. */
   payments?: { rail: "whitechain" | "hedera"; network: string; asset: string; chainId?: number; usdt?: string; settlement?: string; explorer?: string; rpcUrl?: string } | null;
 }
@@ -93,7 +95,15 @@ export interface OutputView {
   faceScore: number | null;
   createdAt: number;
   file: string | null;
+  /** Once released: the file on Swarm. */
+  swarm?: SwarmView | null;
 }
+
+/**
+ * A released ad's file on Swarm: a public gateway link (a showcase ad, as it is), or encrypted (only its brand and
+ * creator open it, in FaceVisa). "pending" while it uploads.
+ */
+export type SwarmView = { state: "uploaded"; ref: string; url: string; encrypted: boolean } | { state: "pending" | "failed" };
 
 /** A request as its creator sees it: the brief, the terms and the finished ad (only they see it before release). */
 export interface CreatorRequest {
@@ -184,6 +194,7 @@ export interface ReceiptView {
   payment?: PaymentView;
   releasedAt: number;
   file: string;
+  swarm?: SwarmView | null;
 }
 
 export interface LicenceView {
@@ -269,6 +280,7 @@ export interface FaceVisaVerify {
   /** This server's Arkiv namespace (for the direct verifier link). */
   namespace?: string | null;
   fileHash?: string;
+  swarm?: SwarmView | null;
 }
 
 async function send<T>(path: string, body?: unknown): Promise<T> {

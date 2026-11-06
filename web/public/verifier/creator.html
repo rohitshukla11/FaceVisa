@@ -5,39 +5,48 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Where is my face used</title>
 <meta name="description" content="Every FaceVisa licence of a creator's face, active, revoked or expired, read from Arkiv directly in your browser: no FaceVisa server, no access key.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Unbounded:wght@700;800&display=swap">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
+<header class="topbar">
+  <div class="topbar-in">
+    <a class="brand" href="/">FACEVISA</a>
+    <nav class="tabs" aria-label="Verifier"><a href="index.html">Check a file</a><a href="creator.html" aria-current="page">Where a face is used</a></nav>
+  </div>
+</header>
 <main>
-  <header style="display:flex;flex-direction:column;gap:6px">
-    <nav><a href="index.html">Check a file</a> · <b>Where is a creator's face used?</b></nav>
+  <div style="display:flex;flex-direction:column;gap:8px">
     <h1>Where is my face used</h1>
-    <p class="muted">Every ad of a creator's face that FaceVisa released, with its licence: in force, revoked or expired. This page asks <b>Arkiv</b> directly, from your browser, and Whitechain's RPC for the payments (Hedera's mirror node for older ones). It doesn't call FaceVisa and needs no account or access key.</p>
-  </header>
+    <p class="lead">Every licensed ad of a creator, read straight from Arkiv in your browser.</p>
+  </div>
 
   <section class="card" aria-label="Creator">
-    <label>The creator's address (the key that owns their listing and licences on Arkiv)
-      <input id="creator" type="text" placeholder="0x…" spellcheck="false" autocomplete="off">
-    </label>
-    <label style="flex-direction:row;align-items:center;gap:8px;color:inherit"><input id="pay" type="checkbox" checked> Check each payment on chain (Whitechain; older ones on Hedera)</label>
+    <div class="row">
+      <label>Creator's address
+        <input id="creator" type="text" placeholder="0x…" spellcheck="false" autocomplete="off">
+      </label>
+      <button id="go" type="button">Look up</button>
+    </div>
     <details>
-      <summary>What is checked against (change only if you know why)</summary>
-      <div style="display:flex;flex-direction:column;gap:8px;padding-top:8px">
-        <label>Namespace (the <code>app</code> attribute)<input id="ns" type="text"></label>
-        <label>FaceVisa's published receipt address (receipts from any other address are not trusted)<input id="receipt" type="text"></label>
-        <label>Arkiv JSON-RPC endpoint (public, no key)<input id="rpc" type="text"></label>
+      <summary>Advanced</summary>
+      <div class="advanced">
+        <label class="check"><input id="pay" type="checkbox" checked> Check each payment on chain</label>
+        <label>Namespace<input id="ns" type="text"></label>
+        <label>Receipt address (only receipts from it are trusted)<input id="receipt" type="text"></label>
+        <label>Arkiv RPC (public, no key)<input id="rpc" type="text"></label>
       </div>
     </details>
-    <button id="go" type="button">Look up on Arkiv</button>
   </section>
 
   <section id="out" class="card" aria-live="polite" hidden></section>
 
-  <footer class="muted" style="display:flex;flex-direction:column;gap:6px">
-    <p><b>How it decides.</b> (1) Only receipts owned by FaceVisa's published receipt address count; receipts that name the creator from any other address are ignored and counted. (2) Each receipt's licence must be owned by the creator's own key and be for that exact file. (3) A revocation record from the creator's key means "Revoked on &lt;date&gt;", and outlives the licence. (4) Otherwise the licence's status and expiry say whether it's in force; when Arkiv has deleted an expired licence, the end recorded on the receipt is shown. (5) Each payment is checked on chain: on Whitechain, <code>LicensePaid</code> from FaceVisa's settlement contract for that file, creator and price; an older x402 payment, on Hedera's mirror node. Each file links to its full check.</p>
-    <p><b>What it can't show.</b> Only ads made and released through FaceVisa have receipts. A copy someone made elsewhere, without a licence, isn't on Arkiv at all.</p>
-    <p>Source: <code>web/public/verifier/</code> in the FaceVisa repository. It also works opened straight from disk.</p>
-  </footer>
+  <details class="card how">
+    <summary>How this is checked</summary>
+    <p>Only receipts written by FaceVisa's published receipt address count, and each licence must be owned by the creator's own key and be for that exact file. A revocation record from the creator's key means "Revoked on &lt;date&gt;". Payments are checked on Whitechain: <code>LicensePaid</code> from FaceVisa's settlement contract, for that file, creator and price.</p>
+    <p>Only ads released through FaceVisa have receipts; a copy made elsewhere isn't on Arkiv. This page needs no FaceVisa server and works opened from disk.</p>
+  </details>
 </main>
 <script src="config.js"></script>
 <script src="verify.js"></script>
@@ -56,7 +65,7 @@
   async function run() {
     var out = $("out");
     out.hidden = false;
-    out.innerHTML = '<p class="muted">Asking Arkiv' + ($("pay").checked ? ", then the chain for each payment" : "") + "… (usually a few seconds)</p>";
+    out.innerHTML = '<p class="muted">Reading Arkiv' + ($("pay").checked ? " and the payments on chain" : "") + "…</p>";
     $("go").disabled = true;
     try {
       var s = settings();
